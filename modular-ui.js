@@ -661,7 +661,11 @@ class uiTopLevelContainer extends ui {
     } else {
       this.name = "modular-ui top level container"
       let e = document.getElementById(element);
-      e.innerHTML += this.html;
+      if (e) {
+        e.innerHTML += this.html;
+      } else {
+        console.log(`Unable to find element "${element}"`);
+      }
     }
 
     this.Init();
