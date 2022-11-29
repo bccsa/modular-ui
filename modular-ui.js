@@ -119,6 +119,7 @@ class ui extends Dispatcher {
     this._parent = undefined; // Reference to the parent control (if any)
     this._element = document.createElement('div'); // Control's top level element. All custom html is added inside this element (see get html())
     this._controls = {}; // List of child controls
+    this._properties = {}; // List of properties populated for properties with getters and setters
     this._controlsQueue = []; // Queue child controls to be created
     this._initQueue = []; // Queue child controls to be initialized while this control is not yet initialized
     this._styles = []; // Add css style paths to this array
@@ -175,7 +176,8 @@ class ui extends Dispatcher {
   }
 
   /**
-   * Implementing class should override this function
+   * Depreciated. Use the property changed event instead: control.on('<propertyName>'), (val) => {})
+   * Implementing class should override this function.
    * This function is called when data has been received through the SetData method.
    * @param {*} propertyName - string property name to be updated to the DOM from the (previously set) control's property.
    */
@@ -285,6 +287,34 @@ class ui extends Dispatcher {
           // Apply css style sheets
           control._styles.forEach(async s => {
             await this.ApplyStyle(s);
+
+            // To do: test if styles are loaded before continuing.
+          });
+
+          // Create getters and setters
+          Object.getOwnPropertyNames(control).forEach((k) => {
+            // Only return settable (not starting with "_") properties
+            if (
+              k[0] != "_" &&
+              (typeof control[k] == "number" ||
+                typeof control[k] == "string" ||
+                typeof control[k] == "boolean" ||
+                Array.isArray(control[k]))
+            ) {
+              // Store property value in _properties list
+              control._properties[k] = control[k];
+
+              // Create getter and setter
+              Object.defineProperty(control, k, {
+                get: function () {
+                  return this._properties[k];
+                },
+                set: function (val) {
+                  this._properties[k] = val;
+                  this.emit(k, val);
+                }
+              });
+            }
           });
 
           // Set control child data
@@ -414,16 +444,8 @@ class ui extends Dispatcher {
     let data = {};
 
     // Get own properties
-    Object.getOwnPropertyNames(this).forEach((k) => {
-      // Only return settable (not starting with "_") properties
-      if (
-        k[0] != "_" &&
-        (typeof this[k] == "number" ||
-          typeof this[k] == "string" ||
-          typeof this[k] == "boolean")
-      ) {
-        data[k] = this[k];
-      }
+    Object.getOwnPropertyNames(this._properties).forEach((k) => {
+        data[k] = this._properties[k];
     });
 
     // Get child controls properties
