@@ -114,7 +114,7 @@ class ui extends Dispatcher {
   constructor() {
     super();
     this.name = "controlName"; // Special property indicating the name of the control. This cannot be changed in runtime, but should be set in the data received when creating new child controls.
-    this._path = ""; // Special property containing the path to the modular-ui base classs. This is only set in the top level control, who is responsible for applying styles and scripts to the DOM.
+    this._path = ""; // Special property containing the path to the modular-ui controls classees.
     this.controlType = this.constructor.name; // The name of the class. This property should not be set in code.
     this._parent = undefined; // Reference to the parent control (if any)
     this._element = document.createElement('div'); // Control's top level element. All custom html is added inside this element (see get html())
@@ -280,6 +280,7 @@ class ui extends Dispatcher {
           let control = new controlClass();
           control.name = c.name;
           control._parent = this;
+          control._path = this._path;
 
           // Apply css style sheets
           control._styles.forEach(async s => {
@@ -390,11 +391,12 @@ class ui extends Dispatcher {
           control._initControl(c.control, c.element);
         }
       });
-      // Print HTML of child control into it's own top level element
-      control._element.innerHTML = control.html;
 
       // Observe controls element for changes to contents
       observer.observe(parentControl[element], { childList: true, attributes: false });
+
+      // Print HTML of child control into it's own top level element
+      control._element.innerHTML = control.html;
 
       // Add the child contol's top level element to the parent's controls div
       parentControl[element].appendChild(control._element);
