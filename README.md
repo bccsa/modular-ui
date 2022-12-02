@@ -1,6 +1,72 @@
 # modular-ui
 A data-first, parent-child structured javascript front-end framework
 
+### Parent - Child structure
+modular-ui makes use of a parent-child structure, where child controls are added as properties to parent controls.
+
+Example:
+```javascript
+{
+    Parent: {
+        controlType: "someControl",
+        property1: "value1",
+        property2: "value2",
+        child1: {
+            controlType: "someOtherControl",
+            childProperty1: "some value",
+            childProperty2: "some value"
+        },
+        child2: {
+            controlType: "evenAnotherControl",
+            childProperty1: "some value",
+            childProperty2: "some value",
+            grandChild1: {
+                controlType: "someControl",
+                grandChildProperty1: "val"
+            }
+        }
+    }
+}
+```
+
+Including child controls' HTML output in the DOM can be done in one of two ways:
+#### 1) Add a div to the parent control and set it to the _controlsDiv property
+```javascript
+get html() {
+    return `
+        <span>Simple control containing child controls</span>
+        <div id=${this._uuid}_yourPreferredID></div>`
+}
+
+Init() {
+    this._controlsDiv = document.getElementById(`${this._uuid}_yourPreferredID`);
+}
+```
+#### 2) Add a div to the parent control with a custom javascript reference, and include the property name in SetData().
+This method is useful when child controls need to be placed in more than one div in the parent control.
+
+Parent control:
+```javascript
+get html() {
+    return `
+        <span>Simple control containing child controls</span>
+        <div id=${this._uuid}_yourPreferredID></div>`
+}
+
+Init() {
+    this._preferredPropertyName = document.getElementById(`${this._uuid}_yourPreferredID`);
+}
+```
+Creating the child through SetData():
+```javascript
+parent.SetData({
+    child1: {
+        controlType: "childControl",
+        parentElement: "_preferredPropertyName"
+    }
+});
+```
+
 ### Notifying property changes
 On control creation through SetData(), properties not starting with "_" of boolean, string, number or array types are automatically equipped with getters and setters. The setters fires an event with the property name and updated value when the property value is set.
 The property values are stored in the control._properties object.
@@ -14,4 +80,4 @@ this.on('propertyName', val => {
 ```
 
 ## Known Issues
-* Child components not loading on insecure (http) sites (tested on Chrome, Edge 107). This is due to the MutationObserver not observing changes to the DOM. It however works correcly when hosted locally or via https.
+* Child components not loading on insecure (http) sites (tested on Chrome, Edge 107). This is due to the MutationObserver not observing changes to the DOM. It however works correctly when hosted locally or via https.
