@@ -310,21 +310,24 @@ class ui extends Dispatcher {
                   return this._properties[k];
                 },
                 set: function (val) {
-                  this._properties[k] = val;
-                  this.emit(k, val);
+                  // Only emit property changes
+                  if (this._properties[k] != val) {
+                    this._properties[k] = val;
+                    this.emit(k, val);
+                  }
                 }
               });
             }
           });
-
-          // Set control child data
-          control.SetData(c.data);
 
           // Add new control to controls list
           this._controls[c.name] = control;
 
           // Add a direct reference to the control in this control
           this[c.name] = control;
+
+          // Set control child data
+          control.SetData(c.data);
 
           // Determine destination element
           let e = "_controlsDiv"; // default div
