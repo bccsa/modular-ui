@@ -81,3 +81,7 @@ this.on('propertyName', val => {
 
 ## Known Issues
 * 
+
+## To do
+[ ] SetData() Performance improvement: Cache object paths on first call.
+[ ] Complete documentation
