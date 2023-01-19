@@ -1,6 +1,22 @@
 # modular-ui
 A data-first, parent-child structured javascript front-end framework
 
+### Identifying DOM elements
+DOM elements can easily be identified by adding a special ```@{identifier}``` tag to the element ID parameter. modular-ui automatically creates class properties for the html DOM elements identified with the special ```@{identifier}``` tag. The actual element ID is created by prefixing the control's unique uuid to the identifier specified in the ```@{identifier}``` special tag.
+
+Example
+```javascript
+get html() {
+    return `
+        <div id="@{myDivName}"></div>
+    `;
+}
+
+Init() {
+    myDivName.innerHtml = 'My custom text set to div in Javascript!';
+}
+```
+
 ### Parent - Child structure
 modular-ui makes use of a parent-child structure, where child controls are added as properties to parent controls.
 
@@ -35,11 +51,7 @@ Including child controls' HTML output in the DOM can be done in one of two ways:
 get html() {
     return `
         <span>Simple control containing child controls</span>
-        <div id=${this._uuid}_yourPreferredID></div>`
-}
-
-Init() {
-    this._controlsDiv = document.getElementById(`${this._uuid}_yourPreferredID`);
+        <div id="@{_controlsDiv}"</div>`
 }
 ```
 #### 2) Add a div to the parent control with a custom javascript reference, and include the property name in SetData().
@@ -50,11 +62,7 @@ Parent control:
 get html() {
     return `
         <span>Simple control containing child controls</span>
-        <div id=${this._uuid}_yourPreferredID></div>`
-}
-
-Init() {
-    this._preferredPropertyName = document.getElementById(`${this._uuid}_yourPreferredID`);
+        <div id="@{_preferredPropertyName}"></div>`
 }
 ```
 Creating the child through SetData():

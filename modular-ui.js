@@ -130,6 +130,7 @@ class ui extends Dispatcher {
     this._controlsDiv = undefined; // Add a DOM reference to the _controlsDiv property if the control must support child controls
     this._init = false; // True when the control has been initilized (DOM linkup complete)
     this._UpdateList = []; // List of properties that needs to be updated
+    this._elementPropertyQueue = []; // List of element objects (added as class properties) and element ID's
     this.parentElement = undefined; // Used to specify in which HTML element in the parent the child should be added
     this.hideData = false; // Set to true if the control's data should be excluded from GetData() and from _notify();
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
@@ -401,6 +402,7 @@ class ui extends Dispatcher {
       const observer = new MutationObserver(function (mutationsList, observer) {
 
         observer.disconnect();
+        control._createElementProperties();
         control.Init();
         control._init = true;
 
@@ -431,13 +433,68 @@ class ui extends Dispatcher {
       observer.observe(parentControl[element], { childList: true, attributes: false });
 
       // Print HTML of child control into it's own top level element
-      control._element.innerHTML = control.html;
+      let parsedHtml = this._parseHtml(control.html, control._uuid);
+      control._element.innerHTML = parsedHtml.html;
+
+      // Add element properties to be created to object element property list
+      control._elementPropertyQueue.push(...parsedHtml.propertyList);
 
       // Add the child contol's top level element to the parent's controls div
       parentControl[element].appendChild(control._element);
     }
     catch (error) {
       console.log(`Unable to add HTML to element "${element}" in control "${parent.name}". ${error.message}`);
+    }
+  }
+
+  /**
+   * Parse html of a control, and creates properties for parsed elements identified with @{identifier} tags.
+   * Currently only html element id's are supported.
+   * @param {string} html 
+   * @returns {Object} - Object with modified html (identifier tags replaced with unique ID's) and a list of properties and corresponding unique element ID's
+   */
+  _parseHtml(html, uuid) {
+    // find HTML elements with ID's set with @{identifier} tags.
+    let idList = html.match(/(id)([ \t]*)?=([ \t]*)?("|')?([ \t]*)?@{[_a-zA-Z0-9]*}/gmi);
+    let propertyList = [];
+    let l = [];
+    if (idList) {
+      if (Array.isArray(idList)) {
+        l.push(...idList);
+      } else {
+        l.push(idList);
+      }
+    }
+    l.forEach(id => {
+      // Exctract property names
+      let identifier = id.match(/@{[_a-zA-Z0-9]*}/gmi);
+      if (Array.isArray(identifier)) {
+        identifier = identifier[0];
+      }
+      identifier = identifier.replace('@{', '').replace('}', '');
+
+      if (identifier) {
+        // Generate unique element ID's for each property
+        propertyList.push({ propertyName: identifier, elementID: uuid + "_" + identifier });
+      }
+    });
+
+    // Replace @{identifier} tags in html with unique element ID's
+    propertyList.forEach(prop => {
+      html = html.replace(`@{${prop.propertyName}}`, prop.elementID);
+    });
+
+    return { html: html, propertyList: propertyList }
+  }
+
+  /**
+   * Create properties in control for each html element listed in propertyList.
+   * @param {*} control 
+   */
+  _createElementProperties() {
+    while (this._elementPropertyQueue.length > 0) {
+      let prop = this._elementPropertyQueue.shift();
+      this[prop.propertyName] = document.getElementById(prop.elementID);
     }
   }
 
@@ -522,7 +579,12 @@ class ui extends Dispatcher {
    * @returns {Promise} - Returns a promise with a true / false result indicating if the script has been loaded successfully
    */
   LoadScript(className) {
-    if (!this._getDynamicClass(className)) {
+    if (this._getDynamicClass(className)) {
+      return new Promise((resolve, reject) => {
+        // Resolve empty promise indicating that no new class was loaded
+        resolve();
+      });
+    } else {
       if (this._parent != undefined) {
         // Pass the request to the top level parent
         return this._parent.LoadScript(className);
@@ -552,9 +614,9 @@ class ui extends Dispatcher {
               // Extract extended class name
               match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
               match = match.replace(/[\t_ \n]*{/gm, '');
-              let extendedClass = await this.LoadScript(match);
-
-              if (extendedClass) {
+              try {
+                await this.LoadScript(match);
+              } catch (err) {
                 reject(`Unable to load extended class "${match}"`);
               }
             }
