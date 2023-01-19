@@ -600,52 +600,49 @@ class ui extends Dispatcher {
           if (!this._pendingScripts[className]) {
             this._pendingScripts[className] = true;
 
-            // Download script file to check if script extends another class
-            let scriptFile = await fetch(this._path + "/" + className + ".js");
-            let text = await scriptFile.text();
-
-            // Match class with extend keyword
-            let match = text.match(/class[\t_a-zA-Z0-9 ]*extends[\t_a-zA-Z0-9 \n]*{/gm);
-            if (Array.isArray(match)) {
-              match = match[0];
-            }
-
-            if (match) {
-              // Extract extended class name
-              match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
-              match = match.replace(/[\t_ \n]*{/gm, '');
-              try {
-                await this.LoadScript(match);
-              } catch (err) {
-                reject(`Unable to load extended class "${match}"`);
-              }
-            }
-
-            // Load script
-            const script = document.createElement('script');
-            script.type = 'text/javascript';
-
-            // Create child controls when the script is done loading
-            script.onload = () => {
-              // Delete the pending controls flag
-              delete this._pendingScripts[className];
-
-              // fire _scriptLoad event
-              this.emit(`_scriptLoad_${className}`, true);
-            }
-
-            // Set script path including the root path passed to the top level parent element
-            script.src = this._path + "/" + className + ".js";
-
-            // Add to DOM head
             try {
+              // Download script file to check if script extends another class
+              let scriptFile = await fetch(this._path + "/" + className + ".js");
+              let text = await scriptFile.text();
+
+              // Match class with extend keyword
+              let match = text.match(/class[\t_a-zA-Z0-9 ]*extends[\t_a-zA-Z0-9 \n]*{/gm);
+              if (Array.isArray(match)) {
+                match = match[0];
+              }
+
+              if (match) {
+                // Extract extended class name
+                match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
+                match = match.replace(/[\t_ \n]*{/gm, '');
+                await this.LoadScript(match);
+              }
+
+              // Load script
+              const script = document.createElement('script');
+              script.type = 'text/javascript';
+
+              // Create child controls when the script is done loading
+              script.onload = () => {
+                // Delete the pending controls flag
+                delete this._pendingScripts[className];
+
+                // fire _scriptLoad event
+                this.emit(`_scriptLoad_${className}`, true);
+              }
+
+              // Set script path including the root path passed to the top level parent element
+              script.src = this._path + "/" + className + ".js";
+
+              // Add to DOM head
               document.head.appendChild(script);
-            }
-            catch (error) {
+            } catch (err) {
               console.log(`Unable to load "${script.path}". ${error.message}`);
               delete this._pendingScripts[className];
 
               this.emit(`_scriptLoad_${className}`, false);
+
+              resolve();
             }
           }
         });
@@ -718,7 +715,7 @@ class ui extends Dispatcher {
   // Generate a unique ID for this control
   _generateUuid() {
     // code from https://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid
-    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
+    return "_" + ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
       (
         c ^
         (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))
