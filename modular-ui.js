@@ -253,9 +253,9 @@ class ui extends Dispatcher {
    */
   async _createControl(data, name) {
     // Pre-load script
-    if (!this._getDynamicClass(data.controlType)) {
-      this.LoadScript(data.controlType + ".js");
-    }
+    this.LoadScript(data.controlType).catch(err => {
+      console.log(err);
+    });
 
     // Add to queue
     this._controlsQueue.push({ data: data, name: name });
@@ -269,10 +269,12 @@ class ui extends Dispatcher {
 
         // Load script if class does not exists
         if (!controlClass) {
-          await this.LoadScript(c.data.controlType + ".js").then(result => {
+          await this.LoadScript(c.data.controlType).then(result => {
             if (result) {
               controlClass = this._getDynamicClass(c.data.controlType);
             }
+          }).catch(err => {
+            console.log(err);
           });
         }
 
@@ -448,7 +450,7 @@ class ui extends Dispatcher {
 
     // Get own properties
     Object.getOwnPropertyNames(this._properties).forEach((k) => {
-        data[k] = this._properties[k];
+      data[k] = this._properties[k];
     });
 
     // Get child controls properties
@@ -516,53 +518,76 @@ class ui extends Dispatcher {
 
   /**
    * Load the javascript file for the passed data.controlType. Re-applies the passed data to the callerControl when the script has been loaded so that the callerControl can create the child control.
-   * @param {string} fileName - name of the control class (script file name excluding extension)
+   * @param {string} className - name of the control class (script file name excluding extension)
    * @returns {Promise} - Returns a promise with a true / false result indicating if the script has been loaded successfully
    */
-  LoadScript(fileName) {
-    if (this._parent != undefined) {
-      // Pass the request to the top level parent
-      return this._parent.LoadScript(fileName);
-    }
-    else {
-      return new Promise((resolve, reject) => {
-        // Subscribe to the _scriptLoad event
-        this.one(`_scriptLoad_${fileName}`, result => {
-          resolve(result);
+  LoadScript(className) {
+    if (!this._getDynamicClass(className)) {
+      if (this._parent != undefined) {
+        // Pass the request to the top level parent
+        return this._parent.LoadScript(className);
+      }
+      else {
+        return new Promise(async (resolve, reject) => {
+          // Subscribe to the _scriptLoad event
+          this.one(`_scriptLoad_${className}`, result => {
+            resolve(result);
+          });
+
+          // Only process first request
+          if (!this._pendingScripts[className]) {
+            this._pendingScripts[className] = true;
+
+            // Download script file to check if script extends another class
+            let scriptFile = await fetch(this._path + "/" + className + ".js");
+            let text = await scriptFile.text();
+
+            // Match class with extend keyword
+            let match = text.match(/class[\t_a-zA-Z0-9 ]*extends[\t_a-zA-Z0-9 \n]*{/gm);
+            if (Array.isArray(match)) {
+              match = match[0];
+            }
+
+            if (match) {
+              // Extract extended class name
+              match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
+              match = match.replace(/[\t_ \n]*{/gm, '');
+              let extendedClass = await this.LoadScript(match);
+
+              if (extendedClass) {
+                reject(`Unable to load extended class "${match}"`);
+              }
+            }
+
+            // Load script
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+
+            // Create child controls when the script is done loading
+            script.onload = () => {
+              // Delete the pending controls flag
+              delete this._pendingScripts[className];
+
+              // fire _scriptLoad event
+              this.emit(`_scriptLoad_${className}`, true);
+            }
+
+            // Set script path including the root path passed to the top level parent element
+            script.src = this._path + "/" + className + ".js";
+
+            // Add to DOM head
+            try {
+              document.head.appendChild(script);
+            }
+            catch (error) {
+              console.log(`Unable to load "${script.path}". ${error.message}`);
+              delete this._pendingScripts[className];
+
+              this.emit(`_scriptLoad_${className}`, false);
+            }
+          }
         });
-
-        // Only process first request
-        if (!this._pendingScripts[fileName]) {
-          this._pendingScripts[fileName] = true;
-
-          // Load script
-          const script = document.createElement('script');
-          script.type = 'text/javascript';
-
-          // Create child controls when the script is done loading
-          script.onload = () => {
-            // Delete the pending controls flag
-            delete this._pendingScripts[fileName];
-
-            // fire _scriptLoad event
-            this.emit(`_scriptLoad_${fileName}`, true);
-          }
-
-          // Set script path including the root path passed to the top level parent element
-          script.src = this._path + "/" + fileName;
-
-          // Add to DOM head
-          try {
-            document.head.appendChild(script);
-          }
-          catch (error) {
-            console.log(`Unable to load "${script.path}". ${error.message}`);
-            delete this._pendingScripts[fileName];
-
-            this.emit(`_scriptLoad_${fileName}`, false);
-          }
-        }
-      });
+      }
     }
   }
 
