@@ -481,7 +481,7 @@ class ui extends Dispatcher {
 
     // Replace @{identifier} tags in html with unique element ID's
     propertyList.forEach(prop => {
-      html = html.replace(`@{${prop.propertyName}}`, prop.elementID);
+      html = html.replaceAll(`@{${prop.propertyName}}`,  prop.elementID);
     });
 
     return { html: html, propertyList: propertyList }
@@ -637,7 +637,7 @@ class ui extends Dispatcher {
               // Add to DOM head
               document.head.appendChild(script);
             } catch (err) {
-              console.log(`Unable to load "${script.path}". ${error.message}`);
+              console.log(`Unable to load "${className}". ${err.message}`);
               delete this._pendingScripts[className];
 
               this.emit(`_scriptLoad_${className}`, false);

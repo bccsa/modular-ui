@@ -17,6 +17,8 @@ Init() {
 }
 ```
 
+Identifiers may only consist of the following characters: _ (underscores), a to z and A to Z.
+
 ### Parent - Child structure
 modular-ui makes use of a parent-child structure, where child controls are added as properties to parent controls.
 
