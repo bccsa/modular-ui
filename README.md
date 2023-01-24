@@ -89,6 +89,42 @@ this.on('propertyName', val => {
 })
 ```
 
+### Events
+moduler-ui implements a configurable event emitter.
+
+#### emit
+Emitting a basic (local) event:
+```javascript
+control.emit('eventName', 'some event data');
+```
+
+The scope can be passed to the event emitter as the third parameter:
+* local (default): Only fire the event on the local control (where it has be emitted).
+* bubble: Fire the event on the local control, and all its ancestors.
+* top: Only fire the event on the top level parent control.
+* local_top: Fire the event on the local control as well as on the top level parent control.
+
+Including the scole:
+```javascript
+control.emit('eventName', 'some event data', 'bubble');
+```
+
+#### on
+Subscribing to events:
+```javascript
+control.on('eventName', data =< {
+    // callback logic
+});
+```
+
+#### one
+Subscribing to events for only one time. (After the event has fired, automatically unsubscribe.)
+```javascript
+control.one('eventName', data =< {
+    // callback logic
+});
+```
+
 ## Known Issues
 * 
 
