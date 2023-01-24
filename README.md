@@ -104,7 +104,7 @@ The scope can be passed to the event emitter as the third parameter:
 * top: Only fire the event on the top level parent control.
 * local_top: Fire the event on the local control as well as on the top level parent control.
 
-Including the scole:
+Including the scope:
 ```javascript
 control.emit('eventName', 'some event data', 'bubble');
 ```
