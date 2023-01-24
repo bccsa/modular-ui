@@ -117,6 +117,7 @@ class ui extends Dispatcher {
     this._path = ""; // Special property containing the path to the modular-ui controls classees.
     this.controlType = this.constructor.name; // The name of the class. This property should not be set in code.
     this._parent = undefined; // Reference to the parent control (if any)
+    this._topLevelParent = undefined; // Reference to the top level parent. Undefined if this control is the top level parent.
     this._element = document.createElement('div'); // Control's top level element. All custom html is added inside this element (see get html())
     this._controls = {}; // List of child controls
     this._properties = {}; // List of properties populated for properties with getters and setters
@@ -286,6 +287,13 @@ class ui extends Dispatcher {
           control.name = c.name;
           control._parent = this;
           control._path = this._path;
+
+          // Set reference to top level parent
+          if (this._topLevelParent) {
+            control._topLevelParent = this._topLevelParent;
+          } else {
+            control._topLevelParent = this;
+          }
 
           // Apply css style sheets
           control._styles.forEach(async s => {
