@@ -8,12 +8,12 @@ Example
 ```javascript
 get html() {
     return `
-        <div id="@{myDivName}"></div>
+        <div id="@{_myDivName}"></div>
     `;
 }
 
 Init() {
-    myDivName.innerHtml = 'My custom text set to div in Javascript!';
+    this._myDivName.innerHtml = 'My custom text set to div in Javascript!';
 }
 ```
 
