@@ -105,11 +105,11 @@ class Dispatcher {
 
 /* #region  modular-ui base class */
 /**
- * moduler-ui base class
+ * modular-ui base class
  */
 class ui extends Dispatcher {
   /**
-   * moduler-ui base class
+   * modular-ui base class
    */
   constructor() {
     super();
@@ -129,7 +129,7 @@ class ui extends Dispatcher {
     this._htmlQueue = {}; // List of controls waiting to be be added to the DOM.
     this._uuid = this._generateUuid(); // Unique ID for this control
     this._controlsDiv = undefined; // Add a DOM reference to the _controlsDiv property if the control must support child controls
-    this._init = false; // True when the control has been initilized (DOM linkup complete)
+    this._init = false; // True when the control has been initialized (DOM linkup complete)
     this._UpdateList = []; // List of properties that needs to be updated
     this._elementPropertyQueue = []; // List of element objects (added as class properties) and element ID's
     this.parentElement = undefined; // Used to specify in which HTML element in the parent the child should be added
@@ -137,6 +137,32 @@ class ui extends Dispatcher {
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
     this.display = 'block'; // Default display style for the control's containing element.
     this.visible = true; // Visibility of the control. If set through SetData() it sets the visibility according to the visibility parameter passed. It can also be controlled via the SHow() and Hide() methods.
+  }
+
+  // -------------------------------------
+  // Overridden functions
+  // -------------------------------------
+  /**
+   * Emit an event
+   * @param {string} eventName 
+   * @param {*} data - Data to be emitted
+   * @param {string} scope - [Optional] local: Only emit on this control; bubble: Emit on this control and all parent controls; top: Only emit on top level parent control; local_top: Emit on both this control and top level parent control; (Default: local)
+   */
+  emit(eventName, data, scope = 'local') {
+    // local emit
+    if (scope == 'local' || scope == 'local_top' || scope == 'bubble') {
+      super.emit(eventName, data);
+    }
+
+    // parent control emit
+    if (scope == 'bubble' && this._parent) {
+      this._parent.emit(eventName, data, scope);
+    }
+
+    // top level control emit
+    if (scope == 'top' || scope == 'local_top') {
+      this._topLevelParent.emit(eventName, data);
+    }
   }
 
   // -------------------------------------
@@ -489,7 +515,7 @@ class ui extends Dispatcher {
 
     // Replace @{identifier} tags in html with unique element ID's
     propertyList.forEach(prop => {
-      html = html.replaceAll(`@{${prop.propertyName}}`,  prop.elementID);
+      html = html.replaceAll(`@{${prop.propertyName}}`, prop.elementID);
     });
 
     return { html: html, propertyList: propertyList }
