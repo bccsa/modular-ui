@@ -241,8 +241,8 @@ class ui extends Dispatcher {
           this[k] != undefined &&
           (typeof this[k] == "number" ||
             typeof this[k] == "string" ||
-            typeof this[k] == "boolean")
-        ) {
+            typeof this[k] == "boolean" ||
+            Array.isArray(this[k]))) {
           if (data[k] != null && data[k] != undefined) {
             this[k] = data[k];
           }
