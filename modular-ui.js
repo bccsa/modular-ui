@@ -137,6 +137,7 @@ class ui extends Dispatcher {
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
     this.display = 'block'; // Default display style for the control's containing element.
     this.visible = true; // Visibility of the control. If set through SetData() it sets the visibility according to the visibility parameter passed. It can also be controlled via the SHow() and Hide() methods.
+    this._element.id = this._uuid;
   }
 
   // -------------------------------------
