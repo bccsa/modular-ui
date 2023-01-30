@@ -88,6 +88,7 @@ this.on('propertyName', val => {
     // implementing logic to handle value change
 })
 ```
+Note: property change events are emitted locally only (see Events - scope = local).
 
 ### Events
 moduler-ui implements a configurable event emitter.
