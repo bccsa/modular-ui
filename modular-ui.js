@@ -228,51 +228,53 @@ class ui extends Dispatcher {
    * @param {*} data 
    */
   SetData(data) {
-    Object.keys(data).forEach((k) => {
-      // Check for remove command
-      if (k == "remove") {
-        if (data[k] == true) {
-          this._parent.RemoveChild(this.name);
-        }
-      }
-      // Ignore invalid and special keys
-      else if (k[0] != "_" && k != "controlType") {
-        // Update this control's settable (not starting with "_") properties
-        if (
-          this[k] != undefined &&
-          (typeof this[k] == "number" ||
-            typeof this[k] == "string" ||
-            typeof this[k] == "boolean" ||
-            Array.isArray(this[k]))) {
-          if (data[k] != null && data[k] != undefined) {
-            this[k] = data[k];
-          }
-          else {
-            // Prevent properties to be set to undefined or null
-            this[k] = `${data[k]}`;
-          }
-
-          // Notify to update the DOM if control has been initialized
-          if (this._init) {
-            this._UpdateList.push(k);
+    if (data && typeof data == 'object') {
+      Object.keys(data).forEach((k) => {
+        // Check for remove command
+        if (k == "remove") {
+          if (data[k] == true) {
+            this._parent.RemoveChild(this.name);
           }
         }
-        // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
-        else if (this._controls[k] != undefined) {
-          this._controls[k].SetData(data[k]);
+        // Ignore invalid and special keys
+        else if (k[0] != "_" && k != "controlType") {
+          // Update this control's settable (not starting with "_") properties
+          if (
+            this[k] != undefined &&
+            (typeof this[k] == "number" ||
+              typeof this[k] == "string" ||
+              typeof this[k] == "boolean" ||
+              Array.isArray(this[k]))) {
+            if (data[k] != null && data[k] != undefined) {
+              this[k] = data[k];
+            }
+            else {
+              // Prevent properties to be set to undefined or null
+              this[k] = `${data[k]}`;
+            }
+  
+            // Notify to update the DOM if control has been initialized
+            if (this._init) {
+              this._UpdateList.push(k);
+            }
+          }
+          // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
+          else if (this._controls[k] != undefined) {
+            this._controls[k].SetData(data[k]);
+          }
+          // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
+          // add new child controls to a controls queue.
+          else if (data[k] != null && data[k].controlType != undefined) {
+            this._createControl(data[k], k);
+          }
         }
-        // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
-        // add new child controls to a controls queue.
-        else if (data[k] != null && data[k].controlType != undefined) {
-          this._createControl(data[k], k);
-        }
-      }
-    });
-
-    // Update the DOM
-    this._UpdateList.forEach((k) => {
-      this.Update(k);
-    });
+      });
+  
+      // Update the DOM
+      this._UpdateList.forEach((k) => {
+        this.Update(k);
+      });
+    }
   }
 
   /**
