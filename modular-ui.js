@@ -366,6 +366,8 @@ class ui extends Dispatcher {
           // Add a direct reference to the control in this control
           this[c.name] = control;
 
+          this.emit('newChildControl', control);
+
           // Set control child data
           control.SetData(c.data);
 
@@ -566,9 +568,13 @@ class ui extends Dispatcher {
    */
   RemoveChild(control) {
     if (this._controls[control] != undefined) {
+      let c = this._controls[control];
       this._controls[control].RemoveHtml();
       delete this._controls[control];
       delete this[control];
+
+      // Emit remove event
+      c.emit('remove', c);
     }
   }
 

@@ -126,9 +126,14 @@ control.one('eventName', data =< {
 });
 ```
 
-## Known Issues
-* 
+## Built-in events
+### remove
+Emitted from a control after removal. The data returned is the control object
+
+### newChildControl
+Emitted from a parent after a child control has been added, but before SetData() is called on the child control.The data returned is the added control object.
+
 
 ## To do
 [ ] SetData() Performance improvement: Cache object paths on first call.
-[ ] Complete documentation
+[ ] Document built-in events
