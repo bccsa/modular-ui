@@ -568,6 +568,7 @@ class ui extends Dispatcher {
     if (this._controls[control] != undefined) {
       this._controls[control].RemoveHtml();
       delete this._controls[control];
+      delete this[control];
     }
   }
 
