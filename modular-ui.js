@@ -145,7 +145,7 @@ class ui extends Dispatcher {
     this._init = false; // True when the control has been initialized (DOM linkup complete)
     this._UpdateList = []; // List of properties that needs to be updated
     this._elementPropertyQueue = []; // List of element objects (added as class properties) and element ID's
-    this.parentElement = undefined; // Used to specify in which HTML element in the parent the child should be added
+    this.parentElement = ''; // Used to specify in which HTML element in the parent the child should be added
     this.hideData = false; // Set to true if the control's data should be excluded from GetData() and from _notify();
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
     this.display = 'block'; // Default display style for the control's containing element.
@@ -330,7 +330,7 @@ class ui extends Dispatcher {
               console.log(err);
             });
           }
-  
+
           // Check that the class is loaded
           if (controlClass) {
             // Create new control
@@ -338,21 +338,21 @@ class ui extends Dispatcher {
             control.name = c.name;
             control._parent = this;
             control._path = this._path;
-  
+
             // Set reference to top level parent
             if (this._topLevelParent) {
               control._topLevelParent = this._topLevelParent;
             } else {
               control._topLevelParent = this;
             }
-  
+
             // Apply css style sheets
             control._styles.forEach(async s => {
               await this.ApplyStyle(s);
-  
+
               // To do: test if styles are loaded before continuing.
             });
-  
+
             // Create getters and setters
             Object.getOwnPropertyNames(control).forEach((k) => {
               // Only return settable (not starting with "_") properties
@@ -365,7 +365,7 @@ class ui extends Dispatcher {
               ) {
                 // Store property value in _properties list
                 control._properties[k] = control[k];
-  
+
                 // Create getter and setter
                 Object.defineProperty(control, k, {
                   get: function () {
@@ -381,24 +381,24 @@ class ui extends Dispatcher {
                 });
               }
             });
-  
+
             // Add new control to controls list
             this._controls[c.name] = control;
-  
+
             // Add a direct reference to the control in this control
             this[c.name] = control;
-  
+
             this.emit('newChildControl', control);
-  
+
             // Set control child data
             control.SetData(c.data);
-  
+
             // Determine destination element
             let e = "_controlsDiv"; // default div
-            if (c.data.parentElement != undefined) {
+            if (c.data.parentElement && typeof c.data.parentElement === 'string') {
               e = c.data.parentElement;
             }
-  
+
             // Initialize child controls, or add to initialization queue if this control is not initialized yet
             if (!this._init) {
               this._initQueue.push({ control: control, element: e });
@@ -468,10 +468,10 @@ class ui extends Dispatcher {
         control.Init();
         control._init = true;
 
-        parentControl._notifyControlCreated(control.name, control);
-
         // Notify that initialization is done
         control.emit("init", control);
+
+        parentControl._notifyControlCreated(control.name, control);
 
         // ################## test logic #######################
         // console.log(`Control ${control.name} added to the DOM`);
@@ -501,7 +501,7 @@ class ui extends Dispatcher {
       // Add element properties to be created to object element property list
       control._elementPropertyQueue.push(...parsedHtml.propertyList);
 
-      // Add the child contol's top level element to the parent's controls div
+      // Add the child control's top level element to the parent's controls div
       parentControl[element].appendChild(control._element);
     }
     catch (error) {
@@ -562,14 +562,17 @@ class ui extends Dispatcher {
 
   /**
    * Get control data as an javascript object
+   * @param {Object} options - { sparse: false/true (true [default]: Do not return empty properties; false: Return empty properties;) }
    * @returns 
    */
-  GetData() {
-    let data = {};
+  GetData(options = { sparse: true }) {
+    var data = {};
 
     // Get own properties
     Object.getOwnPropertyNames(this._properties).forEach((k) => {
-      data[k] = this._properties[k];
+      if (options.sparse && this._properties[k] != '' || !options.sparse) {
+        data[k] = this._properties[k];
+      }
     });
 
     // Get child controls properties
@@ -780,6 +783,7 @@ class ui extends Dispatcher {
     }
 
     this.emit(controlName, control);
+    this.emit('newChildControl', control);
   }
 
   // Generate a unique ID for this control
