@@ -23,6 +23,10 @@ class DispatcherEvent {
     }
   }
 
+  unregisterAll() {
+    this.callbacks.splice(0, this.callbacks.length);
+  }
+
   fire(data) {
     const callbacks = this.callbacks.slice(0);
     var once = [];
@@ -99,6 +103,15 @@ class Dispatcher {
         delete this.events[eventName];
       }
     }
+  }
+
+  /**
+   * Unsubscribe from all events.
+   */
+  clearEvents() {
+    Object.values(this.events).forEach(e => {
+      e.unregisterAll();
+    });
   }
 }
 /* #endregion */
@@ -252,7 +265,7 @@ class ui extends Dispatcher {
               // Prevent properties to be set to undefined or null
               this[k] = `${data[k]}`;
             }
-  
+
             // Notify to update the DOM if control has been initialized
             if (this._init) {
               this._UpdateList.push(k);
@@ -269,7 +282,7 @@ class ui extends Dispatcher {
           }
         }
       });
-  
+
       // Update the DOM
       this._UpdateList.forEach((k) => {
         this.Update(k);
@@ -296,92 +309,102 @@ class ui extends Dispatcher {
       // Process queue
       while (this._controlsQueue.length > 0) {
         let c = this._controlsQueue[0];
-        let controlClass = this._getDynamicClass(c.data.controlType);
 
-        // Load script if class does not exists
-        if (!controlClass) {
-          await this.LoadScript(c.data.controlType).then(result => {
-            if (result) {
-              controlClass = this._getDynamicClass(c.data.controlType);
-            }
-          }).catch(err => {
-            console.log(err);
-          });
-        }
-
-        // Check that the class is loaded
-        if (controlClass) {
-          // Create new control
-          let control = new controlClass();
-          control.name = c.name;
-          control._parent = this;
-          control._path = this._path;
-
-          // Set reference to top level parent
-          if (this._topLevelParent) {
-            control._topLevelParent = this._topLevelParent;
-          } else {
-            control._topLevelParent = this;
-          }
-
-          // Apply css style sheets
-          control._styles.forEach(async s => {
-            await this.ApplyStyle(s);
-
-            // To do: test if styles are loaded before continuing.
-          });
-
-          // Create getters and setters
-          Object.getOwnPropertyNames(control).forEach((k) => {
-            // Only return settable (not starting with "_") properties
-            if (
-              k[0] != "_" &&
-              (typeof control[k] == "number" ||
-                typeof control[k] == "string" ||
-                typeof control[k] == "boolean" ||
-                Array.isArray(control[k]))
-            ) {
-              // Store property value in _properties list
-              control._properties[k] = control[k];
-
-              // Create getter and setter
-              Object.defineProperty(control, k, {
-                get: function () {
-                  return this._properties[k];
-                },
-                set: function (val) {
-                  // Only emit property changes
-                  if (this._properties[k] != val) {
-                    this._properties[k] = val;
-                    this.emit(k, val);
-                  }
-                }
-              });
-            }
-          });
-
-          // Add new control to controls list
-          this._controls[c.name] = control;
-
-          // Add a direct reference to the control in this control
-          this[c.name] = control;
-
-          this.emit('newChildControl', control);
+        // Check if control already exists. This is needed to prevent creation of duplicate controls if SetData() is executed more than once for the same control, resulting in more than one control in the _controlsQueue.
+        if (this._controls[c.name]) {
 
           // Set control child data
-          control.SetData(c.data);
+          this._controls[c.name].SetData(c.data);
+        } else {
 
-          // Determine destination element
-          let e = "_controlsDiv"; // default div
-          if (c.data.parentElement != undefined) {
-            e = c.data.parentElement;
+          // Child control does not exist: continue to create control.
+          let controlClass = this._getDynamicClass(c.data.controlType);
+
+          // Load script if class does not exists
+          if (!controlClass) {
+            await this.LoadScript(c.data.controlType).then(result => {
+              if (result) {
+                controlClass = this._getDynamicClass(c.data.controlType);
+              }
+            }).catch(err => {
+              console.log(err);
+            });
           }
-
-          // Initialize child controls, or add to initialization queue if this control is not initialized yet
-          if (!this._init) {
-            this._initQueue.push({ control: control, element: e });
-          } else {
-            this._initControl(control, e);
+  
+          // Check that the class is loaded
+          if (controlClass) {
+            // Create new control
+            let control = new controlClass();
+            control.name = c.name;
+            control._parent = this;
+            control._path = this._path;
+  
+            // Set reference to top level parent
+            if (this._topLevelParent) {
+              control._topLevelParent = this._topLevelParent;
+            } else {
+              control._topLevelParent = this;
+            }
+  
+            // Apply css style sheets
+            control._styles.forEach(async s => {
+              await this.ApplyStyle(s);
+  
+              // To do: test if styles are loaded before continuing.
+            });
+  
+            // Create getters and setters
+            Object.getOwnPropertyNames(control).forEach((k) => {
+              // Only return settable (not starting with "_") properties
+              if (
+                k[0] != "_" &&
+                (typeof control[k] == "number" ||
+                  typeof control[k] == "string" ||
+                  typeof control[k] == "boolean" ||
+                  Array.isArray(control[k]))
+              ) {
+                // Store property value in _properties list
+                control._properties[k] = control[k];
+  
+                // Create getter and setter
+                Object.defineProperty(control, k, {
+                  get: function () {
+                    return this._properties[k];
+                  },
+                  set: function (val) {
+                    // Only emit property changes
+                    if (this._properties[k] != val) {
+                      this._properties[k] = val;
+                      this.emit(k, val);
+                    }
+                  }
+                });
+              }
+            });
+  
+            // Add new control to controls list
+            this._controls[c.name] = control;
+  
+            // Add a direct reference to the control in this control
+            this[c.name] = control;
+  
+            this.emit('newChildControl', control);
+  
+            // Set control child data
+            control.SetData(c.data);
+  
+            // Determine destination element
+            let e = "_controlsDiv"; // default div
+            if (c.data.parentElement != undefined) {
+              e = c.data.parentElement;
+            }
+  
+            // Initialize child controls, or add to initialization queue if this control is not initialized yet
+            if (!this._init) {
+              this._initQueue.push({ control: control, element: e });
+            } else {
+              this._initControl(control, e);
+            }
           }
         }
 
@@ -575,6 +598,9 @@ class ui extends Dispatcher {
 
       // Emit remove event
       c.emit('remove', c);
+
+      // Unregister from all events
+      c.clearEvents();
     }
   }
 
