@@ -136,6 +136,16 @@ Emitted from a parent after a child control has been added, but before SetData()
 ### init
 Emitted after a control is initialized.
 
+## Built-in functions
+### Show
+Change the display to show the control.
+
+### Hide
+Change the display to hide the control.
+
+## Built-in properties
+### display
+
 ## To do
 [ ] SetData() Performance improvement: Cache object paths on first call.
 [ ] Document built-in events
