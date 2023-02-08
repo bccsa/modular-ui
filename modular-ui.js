@@ -4,6 +4,48 @@
 // Copyright BCC South Africa
 // =====================================
 
+// Map of element types, attributes and matching events supported for automatic data binding.
+// For attributes that cannot be changed from the web-page, the event is set to undefined
+const __bindingMap = {
+  _default: {
+    textContent: { event: undefined },
+    title: { event: undefined },
+  },
+  a: {
+    textContent: { event: undefined },
+    title: { event: undefined },
+    href: { event: undefined },
+  },
+  input: {
+    value: { event: 'change' },
+    check: { event: 'change' },
+    title: { event: undefined },
+    max: { event: undefined },
+    min: { event: undefined },
+    step: { event: undefined },
+    placeholder: { event: undefined },
+  },
+  textArea: {
+    textContent: { event: 'change' },
+    value: { event: 'change' },
+    title: { event: undefined },
+  },
+  select: {
+    value: { event: 'change' },
+    title: { event: undefined },
+  },
+}
+
+// Map of element types and attributes to be ignored
+const __ignoreMap = {
+  elements: {
+
+  },
+  attributes: {
+    for: true,
+  },
+}
+
 /* #region  Dispatcher Event */
 // Code adapted from https://labs.k.io/creating-a-simple-custom-event-system-in-javascript/
 class DispatcherEvent {
@@ -143,8 +185,9 @@ class ui extends Dispatcher {
     this._uuid = this._generateUuid(); // Unique ID for this control
     this._controlsDiv = undefined; // Add a DOM reference to the _controlsDiv property if the control must support child controls
     this._init = false; // True when the control has been initialized (DOM linkup complete)
-    this._UpdateList = []; // List of properties that needs to be updated
-    this._elementPropertyQueue = []; // List of element objects (added as class properties) and element ID's
+    this._updateList = []; // List of properties that needs to be updated
+    this._elementIdQueue = []; // List of element object names (to be added as class properties) and element ID's
+    this._elementAttributeQueue = []; // List of element attributes to be bound to class properties
     this.parentElement = ''; // Used to specify in which HTML element in the parent the child should be added
     this.hideData = false; // Set to true if the control's data should be excluded from GetData() and from _notify();
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
@@ -268,7 +311,7 @@ class ui extends Dispatcher {
 
             // Notify to update the DOM if control has been initialized
             if (this._init) {
-              this._UpdateList.push(k);
+              this._updateList.push(k);
             }
           }
           // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
@@ -284,7 +327,7 @@ class ui extends Dispatcher {
       });
 
       // Update the DOM
-      this._UpdateList.forEach((k) => {
+      this._updateList.forEach((k) => {
         this.Update(k);
       });
     }
@@ -464,7 +507,7 @@ class ui extends Dispatcher {
       const observer = new MutationObserver(function (mutationsList, observer) {
 
         observer.disconnect();
-        control._createElementProperties();
+        control._createDataBindings();
         control.Init();
         control._init = true;
 
@@ -494,12 +537,16 @@ class ui extends Dispatcher {
       // Observe controls element for changes to contents
       observer.observe(parentControl[element], { childList: true, attributes: false });
 
-      // Print HTML of child control into it's own top level element
-      let parsedHtml = this._parseHtml(control.html, control._uuid);
-      control._element.innerHTML = parsedHtml.html;
+      let p = this._parseHtml(control);
 
-      // Add element properties to be created to object element property list
-      control._elementPropertyQueue.push(...parsedHtml.propertyList);
+      // Add element ids for data binding
+      control._elementIdQueue.push(...p.idData);
+
+      // Add element attributes for data binding
+      control._elementAttributeQueue.push(...p.elementData);
+
+      // Print HTML of child control into it's own top level element
+      control._element.innerHTML = p.html;
 
       // Add the child control's top level element to the parent's controls div
       parentControl[element].appendChild(control._element);
@@ -510,55 +557,262 @@ class ui extends Dispatcher {
   }
 
   /**
-   * Parse html of a control, and creates properties for parsed elements identified with @{identifier} tags.
-   * Currently only html element id's are supported.
-   * @param {string} html 
-   * @returns {Object} - Object with modified html (identifier tags replaced with unique ID's) and a list of properties and corresponding unique element ID's
+   * Checks if the passed object is an array.
+   * @returns Array with passed array elements. If passed element is not an array, passes an array with one element.
    */
-  _parseHtml(html, uuid) {
-    // find HTML elements with ID's set with @{identifier} tags.
-    let idList = html.match(/(id)([ \t]*)?=([ \t]*)?("|')?([ \t]*)?@{[_a-zA-Z0-9]*}/gmi);
-    let propertyList = [];
-    let l = [];
-    if (idList) {
-      if (Array.isArray(idList)) {
-        l.push(...idList);
+  __array(data) {
+    if (data != null && data != undefined) {
+      if (Array.isArray(data)) {
+        return data;
       } else {
-        l.push(idList);
+        let a = [];
+        a.push(data);
+        return a;
       }
+    } else {
+      return [];
     }
-    l.forEach(id => {
-      // Exctract property names
-      let identifier = id.match(/@{[_a-zA-Z0-9]*}/gmi);
-      if (Array.isArray(identifier)) {
-        identifier = identifier[0];
-      }
-      identifier = identifier.replace('@{', '').replace('}', '');
-
-      if (identifier) {
-        // Generate unique element ID's for each property
-        propertyList.push({ propertyName: identifier, elementID: uuid + "_" + identifier });
-      }
-    });
-
-    // Replace @{identifier} tags in html with unique element ID's
-    propertyList.forEach(prop => {
-      html = html.replaceAll(`@{${prop.propertyName}}`, prop.elementID);
-    });
-
-    return { html: html, propertyList: propertyList }
   }
 
   /**
-   * Create properties in control for each html element listed in propertyList.
-   * @param {*} control 
+   * Parse html of a control, and creates properties for parsed elements identified with @{identifier} tags.
+   * Currently only html element id's are supported.
+   * @param {string} html 
+   * @returns {Object} - Object with modified html (identifier tags replaced with unique ID's) and data binding data.
    */
-  _createElementProperties() {
-    while (this._elementPropertyQueue.length > 0) {
-      let prop = this._elementPropertyQueue.shift();
-      this[prop.propertyName] = document.getElementById(prop.elementID);
+  _parseHtml(control) {
+    var html = control.html;
+    let eDataList = []; // element data list
+    let idList = {};    // id list
+
+    // Extract HTML elements with class properties inserted with @{identifier} tags
+    let eList = this.__array(html.match(/<[^<]*>[ |\t]?@{[_a-zA-Z0-9]*}[ |\t]?<\/[^<]*>|<[^<]*@{[_a-zA-Z0-9]*}[^<]*(>[^>]*<\/[^<]*>|[\/]?>)/gmi));
+    eList.forEach(elementHtml => {
+      var elementHtml_new = elementHtml;
+
+      // Extract the element type
+      let eType = this.__array(elementHtml.match(/^<[a-zA-Z]*[0-9]?/gmi));
+      if (eType.length > 0) {
+        eType = eType[0].replace('<', '').toLowerCase();;
+      } else {
+        console.log(`${control.name}: Unable to parse element: Element type not set.`);
+        return;
+      }
+
+      // Ignore elements in ignore map
+      if (__ignoreMap.elements[eType]) return;
+
+      // Element data
+      let eData = { elementType: eType, attributes: {} };
+
+      let tagList = [];
+
+      // Extract all instances of @{identifier} tags
+      this.__array(elementHtml.match(/[a-zA-Z]*\=["|']?@{[_a-zA-Z0-9]*}|>[ |\t]*@{[_a-zA-Z0-9]*}[ |\t]*</gmi)).forEach(tData => {
+        // Get attribute type
+        let aType = this.__array(tData.match(/[a-zA-Z]+=/gmi));
+        if (aType.length > 0) {
+          aType = aType[0].replace('=', '');
+        } else {
+          aType = 'textContent';
+        }
+
+        // Ignore attributes in ignore map
+        if (__ignoreMap.attributes[aType]) return;
+
+        // Get the indentifier tag
+        let tag = this.__array(tData.match(/@{[_a-zA-Z0-9]*}/gmi))[0].replace('@{', '').replace('}', '');
+        tagList.push(tag);
+
+        // Add attribute
+        if (!eData.attributes[aType]) {
+          eData.attributes[aType] = tag;
+        } else {
+          console.log(`${control.name}: Unable to link property "${tag}" to element "${eType}" attribute "${aType}": duplicate attribute`);
+        }
+      });
+
+      if (!eData.attributes.id) {
+        // Check element for existing (invalid) ID
+        if (elementHtml.match(/[ |\t]+id=/gmi)) {
+          console.log(`${control.name}: Unable to link properties to element "${eType}": Invalid element ID - ID not an @{identifier} tag)`);
+          return;
+        } else {
+          // Create element ID if element does not have an ID specified
+          // Use the same name for the element object reference (to be created) and the element id
+          let id = `${control._uuid}_id_${this._generateUuid()}`;
+          eData.attributes.id = id;
+          idList[id] = id;
+
+          elementHtml_new = elementHtml_new.replace(/^<[a-zA-Z]*/gmi, `<${eType} id=${id}`);    
+        }
+      } else if (!idList[eData.attributes.id]) {
+        idList[eData.attributes.id] = `${eData.attributes.id}_${control._uuid}`;
+      }
+
+      // Update element with tag values
+      //      filter unique values tags assigned to the element ID
+      tagList.filter((v, i, a) => a.indexOf(v) === i).filter(t => t != eData.attributes.id).forEach(tag => {
+        // Validate tag
+        if (control[tag] != undefined) {
+          // Update element html
+          let r = new RegExp(`@\{${tag}\}`, 'gmi');
+          elementHtml_new = elementHtml_new.replace(r, control[tag]);
+        }
+      });
+
+      // Update html with updated element
+      html = html.replace(elementHtml, elementHtml_new);
+
+      eDataList.push(eData);
+    });
+
+    // Replace all id @{identifier} tags with the generated element id's
+    let idArr = [];
+    Object.keys(idList).forEach(id => {
+      let r = new RegExp(`@\{${id}\}`, 'gmi');
+      html = html.replace(r, idList[id]);
+
+      // Convert id list to array
+      idArr.push({ id: id, elementID: idList[id] });
+    });
+
+    return { html: html, idData: idArr, elementData: eDataList }
+  }
+
+  /**
+   * Create data bindings from @{identifier} tags
+   */
+  _createDataBindings() {
+    // Create element references
+    while (this._elementIdQueue.length > 0) {
+      let i = this._elementIdQueue.shift();
+      if (this[i.id] == undefined) {
+        this[i.id] = document.getElementById(i.elementID);
+        if (!this[i.id]) {
+          console.log(`${this.name}: Unable to create element reference "${i.id}": Element not found`);
+        }
+      } else {
+        console.log(`${this.name}: Unable to create element reference "${i.id}": Class property already exists`);
+      }
+    }
+
+    // Attribute data binding
+    while (this._elementAttributeQueue.length > 0) {
+      let eData = this._elementAttributeQueue.shift();
+
+      Object.keys(eData.attributes).forEach(a => {
+        let prop = eData.attributes[a]; // Property name
+        let elem = this[eData.attributes.id]; // Element reference
+
+        // Subscribe to element changes for supported elements
+        this._bind(eData.elementType, elem, a, prop);
+      });
     }
   }
+
+  /**
+   * Bind a property value to an element attribute. Changes are also notified
+   * @param {*} elementType 
+   * @param {*} element 
+   * @param {*} attribute 
+   * @param {*} property 
+   */
+  _bind(elementType, element, attribute, property) {
+    if (attribute != 'id' && (typeof this[property] != 'object' || Array.isArray(this[property]))) {
+      let e = elementType;
+      if (!__bindingMap[e]) e = '_default';
+
+      if (__bindingMap[e] && __bindingMap[e][attribute]) {
+        this.__bind(element, attribute, __bindingMap[e][attribute].event, property);
+      } else {
+        console.log(`${this.name}: Unable to bind element "${elementType}" attribute "${attribute}" to property "${property}": Unsupported attribute`);
+      }
+    }
+  }
+
+  __bind(element, attribute, event, property) {
+    // Flags to prevent double events
+    let block1 = false;
+    let block2 = false;
+
+    // Subscribe to property change
+    this.on(property, val => {
+      if (!block1) {
+        block2 = true;
+        element[attribute] = val;
+        block2 = false;
+      }
+    });
+
+    if (event) {
+      // Subscribe to element event
+      element.addEventListener(event, () => {
+        if (!block2) {
+          // Parse value
+          let v;
+          switch (typeof this[property]) {
+            case 'string':
+              v = element[attribute].toString();
+              break;
+            case 'number':
+              v = Number.parseFloat(element[attribute].toString());
+              break;
+            case 'boolean':
+              v = element[attribute].toString() === 'true';
+              break;
+            default:
+              console.log(`${this.name}: Unable to process element changes "${event}" for property "${property}": Unsupported property type (property not string, number or boolean)`);
+              break;
+          }
+
+          if (v != undefined) {
+            block1 = true;
+            this[property] = v;
+            block1 = false;
+
+            // Notify property change
+            this.NotifyProperty(property);
+          } else {
+            console.log(`${this.name}: Unable to process element changes "${event}" for property "${property}": Invalid value (value not string, number or boolean)`);
+          }
+        }
+
+      });
+    }
+  }
+
+  // // Set initial value
+  // this[b.element].value = this[b.valueProperty];
+
+  // // Flags for preventing double event firing
+  // let block1 = false;
+  // let block2 = false;
+
+  // // Listen for element value change
+  // let t = this;
+  // this[b.element].addEventListener('change', e => {
+  //   if (!block2) {
+  //     block1 = true;
+  //     block2 = false;
+  //     // To do: parse value if needed
+  //     t[b.valueProperty] = e.target.value;
+
+  //     // Notify change
+  //     t.NotifyProperty(b.valueProperty);
+  //   }
+  // });
+
+  // // Listen for property changes
+  // this.on(b.valueProperty, val => {
+  //   if (!block1) {
+  //     block2 = true;
+  //     block1 = false;
+
+  //     this[b.element].value = val;
+  //   }
+  // });
+
 
   /**
    * Get control data as an javascript object

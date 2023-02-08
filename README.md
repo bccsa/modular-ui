@@ -1,23 +1,43 @@
 # modular-ui
-A data-first, parent-child structured javascript front-end framework
+A data-first, event driven, parent-child structured javascript front-end framework
 
-### Identifying DOM elements
-DOM elements can easily be identified by adding a special ```@{identifier}``` tag to the element ID parameter. modular-ui automatically creates class properties for the html DOM elements identified with the special ```@{identifier}``` tag. The actual element ID is created by prefixing the control's unique uuid to the identifier specified in the ```@{identifier}``` special tag.
+### Identifier tags
+Identifier tags ```@{identifier}``` can be used in the control's HTML to easily create references to elements and to link element attributes / text content to control class properties. Supported element attributes are automatically updated on class property value changes, and supported input elements will automatically update the class property value and notify the change (see (#notifying-property-changes-externally)).
+
+When tagging elements with an ```@{identifier}``` id, a new class property is created with the javascript object reference to the element. When tagging element attributes / text content with an ```@{identifier}``` tag, modular-ui will attempt to link the element attribute's value to an existing class property named the same as the ```@{identifier}``` text.
+
+Identifiers may only consist of the following characters: _ (underscore), a to z and A to Z.
+
+**Important**
+Take care not to use property names as element id ```@{identifier}``` tags. modular-ui creates new properties for element references, and will fail to do so if the property already exists.
 
 Example
 ```javascript
-get html() {
-    return `
-        <div id="@{_myDivName}"></div>
-    `;
-}
+class demo extends ui {
+    constructor() {
+        super();
 
-Init() {
-    this._myDivName.innerHtml = 'My custom text set to div in Javascript!';
+        this.coolProperty = 'Default cool value';
+        this.anotherCoolProperty = 'The second cool value';
+    }
+
+    get html() {
+    return `
+        <span id="@{_coolElement}">@{coolProperty}</span>
+        <label>@{anotherCoolProperty}</label>
+        <input type="text" value="@{anotherCoolProperty}"/>`;
+    }
+
+    Init() {
+        // Do some amazing things with the element
+        this._coolElement.style.color = 'green';
+
+        // Update property to automatically update the element value
+        this.coolProperty = 'Another amazing value';
+    }
 }
 ```
-
-Identifiers may only consist of the following characters: _ (underscores), a to z and A to Z.
+In the above example the label text content and text input value will both be linked to the 'anotherCoolProperty' class property.
 
 ### Parent - Child structure
 modular-ui makes use of a parent-child structure, where child controls are added as properties to parent controls.
@@ -90,6 +110,31 @@ this.on('propertyName', val => {
 ```
 Note: property change events are emitted locally only (see Events - scope = local).
 
+### Notifying property changes externally
+When calling ```this.NotifyProperty('property_name')```, modular-ui will fire a 'data' event from the top level control containing the full path to the property.
+
+*Note*
+When using ```@{identifier}``` tags in user editable HTML element attributes, modular-ui will automatically call 'NotifyProperty' for the associated class property when the element attribute value is changed by the user.
+
+Example
+```javascript
+// This is the top level control created in the main JavaScript file
+control.on('data', data => {
+    console.log(data);
+});
+```
+console output:
+```javascript
+{
+    grandParent: {
+        parent: {
+            child: {
+                coolProperty: 'new cool value'
+            }
+        }
+    }
+}
+```
 ### Events
 moduler-ui implements a configurable event emitter.
 
