@@ -5,34 +5,32 @@
 // =====================================
 
 // Map of element types, attributes and matching events supported for automatic data binding.
-// For attributes that cannot be changed from the web-page, the event is set to undefined
+// For attributes that can be changed from the web-page, the event name is included.
+// For attributes that only should be set in JavaScript (i.e removed from the element HTML), jsOnly is set to true.
+// If a element type cannot be found or an attribute is not listed under the specified element type, modular-ui will try to find the attribute in _default.
 const __bindingMap = {
   _default: {
-    textContent: { event: undefined },
-    title: { event: undefined },
+    textContent: { },
+    title: { },
+    hidden: { jsOnly: true }
   },
   a: {
-    textContent: { event: undefined },
-    title: { event: undefined },
-    href: { event: undefined },
+    href: { },
   },
   input: {
     value: { event: 'change' },
-    checked: { event: 'click' },
-    title: { event: undefined },
-    max: { event: undefined },
-    min: { event: undefined },
-    step: { event: undefined },
-    placeholder: { event: undefined },
+    checked: { event: 'change', jsOnly: true },
+    max: { },
+    min: { },
+    step: { },
+    placeholder: { },
   },
   textArea: {
     textContent: { event: 'change' },
     value: { event: 'change' },
-    title: { event: undefined },
   },
   select: {
     value: { event: 'change' },
-    title: { event: undefined },
   },
 }
 
@@ -650,6 +648,15 @@ class ui extends Dispatcher {
         idList[eData.attributes.id] = `${eData.attributes.id}_${control._uuid}`;
       }
 
+      // Remove JavaScript only attributes from HTML
+      Object.keys(eData.attributes).forEach(attribute => {
+        if (__bindingMap[eType] && __bindingMap[eType][attribute] && __bindingMap[eType][attribute].jsOnly) {
+          // Update element html
+          let r = new RegExp(`${attribute}=[ |\t]*["|']?@\{${eData.attributes[attribute]}\}["|']?`, 'gmi');
+          elementHtml_new = elementHtml_new.replace(r, '');
+        }
+      });
+
       // Update element with tag values
       //      filter unique values tags assigned to the element ID
       tagList.filter((v, i, a) => a.indexOf(v) === i).filter(t => t != eData.attributes.id).forEach(tag => {
@@ -721,9 +728,13 @@ class ui extends Dispatcher {
   _bind(elementType, element, attribute, property) {
     if (attribute != 'id' && (typeof this[property] != 'object' || Array.isArray(this[property]))) {
       let e = elementType;
-      if (!__bindingMap[e]) e = '_default';
-
+      // Set element type to _default if element + attribute combination is not found in map.
+      if (!__bindingMap[e] || !__bindingMap[e][attribute]) e = '_default';
+      
       if (__bindingMap[e] && __bindingMap[e][attribute]) {
+        // Set initial value for JavaScript only attributes
+        if (__bindingMap[e][attribute].jsOnly) element[attribute] = this[property];
+
         this.__bind(element, attribute, __bindingMap[e][attribute].event, property);
       } else {
         console.log(`${this.name}: Unable to bind element "${elementType}" attribute "${attribute}" to property "${property}": Unsupported attribute`);
@@ -746,6 +757,10 @@ class ui extends Dispatcher {
     });
 
     if (event) {
+      if (!element || !element.addEventListener) {
+        console.log(`${this.name}: Unable to add event listner "${event}" for property "${property}": Invalid element`);
+        return;
+      }
       // Subscribe to element event
       element.addEventListener(event, () => {
         if (!block2) {

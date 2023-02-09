@@ -11,6 +11,9 @@ Identifiers may only consist of the following characters: _ (underscore), a to z
 **Important**
 Take care not to use property names as element id ```@{identifier}``` tags. modular-ui creates new properties for element references, and will fail to do so if the property already exists.
 
+**Empty attributes**
+Attributes such as ```hidden``` and ```checked``` are not set with a value in html. modular-ui sees these attributes as 'JavaScript only' attributes and removes it from the html template before adding it to the DOM, but sets the value of the attribute through JavaScript after the html has been inserted into the DOM. Empty attributes should be linked to class properties the same as normal attributes adding the ```@{identifier}``` tag (e.g. ```checked=@{checkedProperty}```).
+
 Example
 ```javascript
 class demo extends ui {
