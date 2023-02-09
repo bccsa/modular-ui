@@ -25,9 +25,8 @@ const __bindingMap = {
     step: { },
     placeholder: { },
   },
-  textArea: {
-    textContent: { event: 'change' },
-    value: { event: 'change' },
+  textarea: {
+    value: { event: 'change', jsOnly: true },
   },
   select: {
     value: { event: 'change' },
@@ -591,7 +590,7 @@ class ui extends Dispatcher {
       // Extract the element type
       let eType = this.__array(elementHtml.match(/^<[a-zA-Z]*[0-9]?/gmi));
       if (eType.length > 0) {
-        eType = eType[0].replace('<', '').toLowerCase();;
+        eType = eType[0].replace('<', '').toLowerCase();
       } else {
         console.log(`${control.name}: Unable to parse element: Element type not set.`);
         return;
