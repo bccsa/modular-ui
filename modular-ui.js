@@ -18,7 +18,7 @@ const __bindingMap = {
   },
   input: {
     value: { event: 'change' },
-    check: { event: 'change' },
+    checked: { event: 'click' },
     title: { event: undefined },
     max: { event: undefined },
     min: { event: undefined },
