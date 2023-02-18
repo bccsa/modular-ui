@@ -1099,7 +1099,7 @@ class ui extends Dispatcher {
 class uiTopLevelContainer extends ui {
   /**
    * Top level container is added to the passed DOM element. Use the SetData() function to add child controls to the top level element.
-   * @param {string} path - path to the modular-ui control. If not passed, assume that the modular-ui files are in the root folder.
+   * @param {string} path - path to the modular-ui controls directory. If not passed, assume that the modular-ui js files are in the root folder.
    * @param {string} element - ID of the HTML DOM element where the top level container should be inserted. If not passed, the top level container is added directly to the body element.
    */
   constructor(path, element) {
