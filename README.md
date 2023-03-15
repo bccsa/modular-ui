@@ -1,6 +1,9 @@
 # modular-ui
 A data-first, event driven, parent-child structured javascript front-end framework
 
+### Structure
+"User Controls" are created as JavaScript classes. (Class inheritance is supported.) Child controls are added as key / value pairs to parent controls.
+
 ### Identifier tags
 Identifier tags ```@{identifier}``` can be used in the control's HTML to easily create references to elements and to link element attributes / text content to control class properties. Supported element attributes are automatically updated on class property value changes, and supported input elements will automatically update the class property value and notify the change (see (#notifying-property-changes-externally)).
 
