@@ -583,7 +583,7 @@ class ui extends Dispatcher {
     let idList = {};    // id list
 
     // Extract HTML elements with class properties inserted with @{identifier} tags
-    let eList = this.__array(html.match(/<[^<]*>[ |\t]?@{[_a-zA-Z0-9]*}[ |\t]?<\/[^<]*>|<[^<]*@{[_a-zA-Z0-9]*}[^<]*(>[^>]*<\/[^<]*>|[\/]?>)/gmi));
+    let eList = this.__array(html.match(/<[^<]*>[ |\t|\n]*@{[_a-zA-Z0-9]*}[ |\t|\n]*<\/[^<]*>|<[^<]*@{[_a-zA-Z0-9]*}[^<]*(>[^>]*<\/[^<]*>|[\/]?>)/gmi));
     eList.forEach(elementHtml => {
       var elementHtml_new = elementHtml;
 
@@ -605,7 +605,7 @@ class ui extends Dispatcher {
       let tagList = [];
 
       // Extract all instances of @{identifier} tags
-      this.__array(elementHtml.match(/[a-zA-Z]*\=["|']?@{[_a-zA-Z0-9]*}|>[ |\t]*@{[_a-zA-Z0-9]*}[ |\t]*</gmi)).forEach(tData => {
+      this.__array(elementHtml.match(/[a-zA-Z]*\=["|']?@{[_a-zA-Z0-9]*}|>[ |\t|\n]*@{[_a-zA-Z0-9]*}[ |\t|\n]*</gmi)).forEach(tData => {
         // Get attribute type
         let aType = this.__array(tData.match(/[a-zA-Z]+=/gmi));
         if (aType.length > 0) {
