@@ -644,7 +644,7 @@ class ui extends Dispatcher {
           eData.attributes.id = id;
           idList[id] = id;
 
-          elementHtml_new = elementHtml_new.replace(/^<[a-zA-Z]*/gmi, `<${eType} id=${id}`);    
+          elementHtml_new = elementHtml_new.replace(/^<[a-zA-Z]*/gmi, `<${eType} id="${id}"`);    
         }
       } else if (!idList[eData.attributes.id]) {
         idList[eData.attributes.id] = `${eData.attributes.id}_${control._uuid}`;
