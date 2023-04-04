@@ -31,6 +31,9 @@ const __bindingMap = {
   select: {
     value: { event: 'change' },
   },
+  img: {
+    src: { },
+  },
 }
 
 // Map of element types and attributes to be ignored
