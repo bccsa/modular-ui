@@ -12,7 +12,8 @@ const __bindingMap = {
   _default: {
     textContent: { },
     title: { },
-    hidden: { jsOnly: true }
+    hidden: { jsOnly: true },
+    disabled: { jsOnly: true },
   },
   a: {
     href: { },
@@ -34,6 +35,10 @@ const __bindingMap = {
   img: {
     src: { },
   },
+  progress: {
+    max: { },
+    value: { },
+  }
 }
 
 // Map of element types and attributes to be ignored
