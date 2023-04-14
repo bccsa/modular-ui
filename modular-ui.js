@@ -196,7 +196,7 @@ class ui extends Dispatcher {
     this.parentElement = ''; // Used to specify in which HTML element in the parent the child should be added
     this.hideData = false; // Set to true if the control's data should be excluded from GetData() and from _notify();
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
-    this.display = 'block'; // Default display style for the control's containing element.
+    this.display = 'inherit'; // Default display style for the control's containing element.
     this.visible = true; // Visibility of the control. If set through SetData() it sets the visibility according to the visibility parameter passed. It can also be controlled via the SHow() and Hide() methods.
     this._element.id = this._uuid;
   }
