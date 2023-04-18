@@ -38,7 +38,10 @@ const __bindingMap = {
   progress: {
     max: { },
     value: { },
-  }
+  },
+  video: {
+    src: { },
+  },
 }
 
 // Map of element types and attributes to be ignored
