@@ -10,21 +10,21 @@
 // If a element type cannot be found or an attribute is not listed under the specified element type, modular-ui will try to find the attribute in _default.
 const __bindingMap = {
   _default: {
-    textContent: { },
-    title: { },
+    textContent: {},
+    title: {},
     hidden: { jsOnly: true },
     disabled: { jsOnly: true },
   },
   a: {
-    href: { },
+    href: {},
   },
   input: {
     value: { event: 'change' },
     checked: { event: 'change', jsOnly: true },
-    max: { },
-    min: { },
-    step: { },
-    placeholder: { },
+    max: {},
+    min: {},
+    step: {},
+    placeholder: {},
   },
   textarea: {
     value: { event: 'change', jsOnly: true },
@@ -33,14 +33,14 @@ const __bindingMap = {
     value: { event: 'change' },
   },
   img: {
-    src: { },
+    src: {},
   },
   progress: {
-    max: { },
-    value: { },
+    max: {},
+    value: {},
   },
   video: {
-    src: { },
+    src: {},
   },
 }
 
@@ -173,6 +173,16 @@ class Dispatcher {
 class ui extends Dispatcher {
   /**
    * modular-ui base class
+   * @property {string} name - Special property indicating the name of the control. This property should not be set in code.
+   * @property {string} controlType - The name of the class. This property should not be set in code.
+   * @property {string} parentElement - Reference object name of the HTML element in which child controls should be added. Default: "_controlsDiv".
+   * @property {boolean} hideData - When true, excludes this control and subsequent child controls' data from GetData() results and 'data' events.
+   * @property {boolean} remove - When set to true through SetData(), removes this control (or the child control passed to) from the DOM and from the modular-ui data model.
+   * @property {string} cssText - CSS style text to be applied to the control's containing HTML element (div).
+   * @property {string} cssClass - CSS class or list of space separated classes to be applied to the control's containg HTML element (div).
+   * @property {boolean} visible - Sets the control's visibility in the DOM. Visibility is controlled by setting the "display" CSS parameter of the control's containing HTML element (div) according to the customisable values "control.visibleDisplayCss" and "control.hiddenDisplayCss". Default: true.
+   * @property {string} visibleDisplayCss - Visible CSS display setting. Default: "inherit".
+   * @property {string} hiddenDisplayCss - Hidden CSS display setting. Default: "none".
    */
   constructor() {
     super();
@@ -185,23 +195,28 @@ class ui extends Dispatcher {
     this._controls = {}; // List of child controls
     this._properties = {}; // List of properties populated for properties with getters and setters
     this._controlsQueue = []; // Queue child controls to be created
-    this._initQueue = []; // Queue child controls to be initialized while this control is not yet initialized
+    this._htmlControlQueue = []; // Queue child controls to be initialized while this control is not yet initialized
     this._styles = []; // Add css style paths to this array
     this._appliedStyles = []; // List of applied CSS style sheets
     this._pendingScripts = {}; // List of controls waiting for the loaded script to be applied
-    this._htmlQueue = {}; // List of controls waiting to be be added to the DOM.
+    this._htmlElementQueue = {}; // List of controls waiting to be be added to the DOM.
     this._uuid = this._generateUuid(); // Unique ID for this control
-    this._controlsDiv = undefined; // Add a DOM reference to the _controlsDiv property if the control must support child controls
     this._init = false; // True when the control has been initialized (DOM linkup complete)
-    this._updateList = []; // List of properties that needs to be updated
     this._elementIdQueue = []; // List of element object names (to be added as class properties) and element ID's
     this._elementAttributeQueue = []; // List of element attributes to be bound to class properties
-    this.parentElement = ''; // Used to specify in which HTML element in the parent the child should be added
+    this.parentElement = '_controlsDiv'; // Reference object name of the HTML element in which child controls should be added.
     this.hideData = false; // Set to true if the control's data should be excluded from GetData() and from _notify();
     this.remove = undefined; // When control.remove : true is passed to the control via SetData(), the control is removed by it's parent.
-    this.display = 'inherit'; // Default display style for the control's containing element.
-    this.visible = true; // Visibility of the control. If set through SetData() it sets the visibility according to the visibility parameter passed. It can also be controlled via the SHow() and Hide() methods.
+    this.cssText = ''; // CSS style to be applied to the control's containing element.
+    this.cssClass = ''; // CSS class or list of space separated classes to be applied to the control's containg element.
+    this.visible = true; // Visibility of the control.
     this._element.id = this._uuid;
+    this.visibleDisplayCss = 'inherit'; // Visible css display setting.
+    this.hiddenDisplayCss = 'none'; // Hidden css display setting.
+    this._elementPollCounter = 0; // Counter used by fallbackTimer when polling if container element is added to the DOM
+
+    // Hide control's containing html div element on creation
+    this._element.style.display = 'none';
   }
 
   // -------------------------------------
@@ -262,19 +277,11 @@ class ui extends Dispatcher {
   }
 
   /**
-   * Remove the control from the DOM
+   * Depreciated. Controls now includes a containing HTML element which modular-ui identifies automatically, and which is used to remove the control's HTML from the DOM.
    */
   RemoveHtml() {
     this._element.remove();
   }
-
-  /**
-   * Depreciated. Use the property changed event instead: control.on('<propertyName>'), (val) => {})
-   * Implementing class should override this function.
-   * This function is called when data has been received through the SetData method.
-   * @param {*} propertyName - string property name to be updated to the DOM from the (previously set) control's property.
-   */
-  Update(propertyName) { }
 
   // -------------------------------------
   // Core functions
@@ -291,7 +298,7 @@ class ui extends Dispatcher {
    * Sets a javascript data object, and updates values, creates and removes controls as applicable.
    * @param {*} data 
    */
-  SetData(data) {
+  Set(data) {
     if (data && typeof data == 'object') {
       Object.keys(data).forEach((k) => {
         // Check for remove command
@@ -316,11 +323,6 @@ class ui extends Dispatcher {
               // Prevent properties to be set to undefined or null
               this[k] = `${data[k]}`;
             }
-
-            // Notify to update the DOM if control has been initialized
-            if (this._init) {
-              this._updateList.push(k);
-            }
           }
           // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
           else if (this._controls[k] != undefined) {
@@ -333,12 +335,14 @@ class ui extends Dispatcher {
           }
         }
       });
-
-      // Update the DOM
-      this._updateList.forEach((k) => {
-        this.Update(k);
-      });
     }
+  }
+
+  /**
+   * Depreciated. Use Set().
+   */
+  SetData(data) {
+    this.Set(data);
   }
 
   /**
@@ -348,7 +352,7 @@ class ui extends Dispatcher {
    */
   async _createControl(data, name) {
     // Pre-load script
-    this.LoadScript(data.controlType).catch(err => {
+    this._loadScript(data.controlType).catch(err => {
       console.log(err);
     });
 
@@ -373,7 +377,7 @@ class ui extends Dispatcher {
 
           // Load script if class does not exists
           if (!controlClass) {
-            await this.LoadScript(c.data.controlType).then(result => {
+            await this._loadScript(c.data.controlType).then(result => {
               if (result) {
                 controlClass = this._getDynamicClass(c.data.controlType);
               }
@@ -397,7 +401,7 @@ class ui extends Dispatcher {
               control._topLevelParent = this;
             }
 
-            // Apply css style sheets
+            // Apply css style sheets_controlsQueue
             control._styles.forEach(async s => {
               await this.ApplyStyle(s);
 
@@ -439,10 +443,26 @@ class ui extends Dispatcher {
             // Add a direct reference to the control in this control
             this[c.name] = control;
 
-            this.emit('newChildControl', control);
-
             // Set control child data
             control.SetData(c.data);
+
+            // Control interal event subscriptions. Event subscriptions deliberately are done after control data is set 
+            // (i.e. they will not emit on control creation).
+            // This is done to prevent unexpected behavior before the control is completely initialised. Any initial values are
+            // set individually where needed.
+            control.on('visible', visible => {
+              if (visible) {
+                control._element.style.display = control.visibleDisplayCss;
+              } else {
+                control._element.style.display = control.hiddenDisplayCss;
+              }
+            });
+            this.on('cssText', val => {
+              element.style.cssText = val;
+            });
+            this.on('cssClass', val => {
+              element.className = val;
+            });
 
             // Determine destination element
             let e = "_controlsDiv"; // default div
@@ -450,11 +470,11 @@ class ui extends Dispatcher {
               e = c.data.parentElement;
             }
 
-            // Initialize child controls, or add to initialization queue if this control is not initialized yet
+            // Initialize child controls, or add to html controls queue if this control is not initialized yet
             if (!this._init) {
-              this._initQueue.push({ control: control, element: e });
+              this._htmlControlQueue.push(control);
             } else {
-              this._initControl(control, e);
+              this._addHtmlQueue(control);
             }
           }
         }
@@ -466,39 +486,25 @@ class ui extends Dispatcher {
   }
 
   /**
-   * Initialize a child control and print it in the passed element name
-   * @param {object} control - Control to be initialized
-   * @param {string} element - Element name (string)
+   * Add control to _addHtml queue
+   * @param {object} control - Control to be added
    */
-  _initControl(control, element) {
+  _addHtmlQueue(control) {
     if (control != undefined && control.name != undefined) {
-      // Set control visibility
-      if (control.visible) {
-        control.Show();
-      }
-      else {
-        control.Hide();
-      }
-
       // Create queue for the passed element
-      if (this._htmlQueue[element] == undefined) {
-        this._htmlQueue[element] = [];
+      if (this._htmlElementQueue[control.parentElement] == undefined) {
+        this._htmlElementQueue[control.parentElement] = [];
       }
 
-      if (this._htmlQueue[element].length > 0) {
-        // another control is already being initialized. Add to queue
-        this._htmlQueue[element].push(control);
-      }
-      else {
-        // This is the first control to be added to the DOM.
-        // Add to init queue
-        this._htmlQueue[element].push(control);
+      this._htmlElementQueue[control.parentElement].push(control);
 
-        this._addHtml(element)
+      if (this._htmlElementQueue[control.parentElement].length == 1) {
+        // This is the first control to be added to the element. Start the _addHtml loop
+        this._addHtml(control.parentElement)
       }
     }
     else {
-      console.log(`Unable to add control to element "${element}"`)
+      console.log(`Unable to add control "${control.name}" to element "${control.parentElement}"`)
     }
   }
 
@@ -508,43 +514,40 @@ class ui extends Dispatcher {
    */
   _addHtml(element) {
     try {
-      let control = this._htmlQueue[element][0];
-
-      // Wait for HTML to be printed in the element, and call Init
+      let control = this._htmlElementQueue[element][0];
       let parentControl = this;
-      const observer = new MutationObserver(function (mutationsList, observer) {
+      let observer;
 
-        observer.disconnect();
-        control._createDataBindings();
-        control.Init();
-        control._init = true;
-
-        // Notify that initialization is done
-        control.emit("init", control);
-
-        parentControl._notifyControlCreated(control.name, control);
-
-        // ################## test logic #######################
-        // console.log(`Control ${control.name} added to the DOM`);
-
-        // Remove control from the queue
-        parentControl._htmlQueue[element].shift();
-
-        // Add html of subsequent controls in the queue
-        if (parentControl._htmlQueue[element] != undefined && parentControl._htmlQueue[element].length > 0) {
-          parentControl._addHtml(element);
+      // Wait for HTML to be printed in the element before initializing control
+      // Fallback timer as workaround when mutation observer is not triggering (sometimes occurs when Chrome dev-tools is open)
+      let fallbackTimer = setInterval(() => {
+        // Try counter
+        control._elementPollCounter += 1;
+        
+        // Check if containing element exists in DOM
+        if (document.getElementById(control._element.id)) {
+          console.log(`Falling back to polling mechanism for control "${control.name}"`);
+          this._htmlInit(observer, parentControl, element, control, fallbackTimer);
+        } 
+        // Element not created. Stop polling
+        else if (control._elementPollCounter >= 10) {
+          // Stop fallback interval timer and mutation observer
+          if (observer) observer.disconnect();
+          clearInterval(fallbackTimer);
+          delete control._elementPollCounter;
+          console.log(`Unable to add HTML to element "${element}" in control "${parentControl.name}". Element ID not found in DOM.`);
         }
+      }, 20);
 
-        // Add queued child controls
-        while (control._initQueue.length > 0) {
-          let c = control._initQueue.shift();
-          control._initControl(c.control, c.element);
-        }
+      // Mutation observer
+      observer = new MutationObserver(function (mutationsList, observer) {
+        parentControl._htmlInit(observer, parentControl, element, control, fallbackTimer);
       });
 
       // Observe controls element for changes to contents
       observer.observe(parentControl[element], { childList: true, attributes: false });
 
+      // Parse control html
       let p = this._parseHtml(control);
 
       // Add element ids for data binding
@@ -560,8 +563,57 @@ class ui extends Dispatcher {
       parentControl[element].appendChild(control._element);
     }
     catch (error) {
-      console.log(`Unable to add HTML to element "${element}" in control "${parent.name}". ${error.message}`);
+      console.log(`Unable to add HTML to element "${element}" in control "${this.name}". ${error.message}`);
     }
+  }
+
+  // Initialize control after added to the DOM
+  _htmlInit(observer, parentControl, element, control, fallbackTimer) {
+    // Disconnect mutation observer and stop fallback interval timer
+    observer.disconnect();
+    clearInterval(fallbackTimer);
+    delete control._elementPollCounter;
+
+    // Data bind values from @{identifier} tags
+    control._createDataBindings();
+
+    // Apply css to the control's containing _element
+    control._element.style.cssText = control.cssText;
+    control._element.className = control.cssClass;
+    control._visibleDisplayCss = control._element.style.display;
+
+    // Set initial visibility
+    if (control.visible) {
+      control._element.style.display = control.visibleDisplayCss;
+    } else {
+      control._element.style.display = control.hiddenDisplayCss;
+    }
+
+    // Run (overridden) control initialisation logic
+    control.Init();
+    control._init = true;
+
+    // Notify that initialization is done
+    control.emit("init", control);
+    parentControl.emit(control.name, control);
+    parentControl.emit('newChildControl', control);
+
+    // Remove control from the queue
+    parentControl._htmlElementQueue[element].shift();
+
+    // Add html of subsequent controls in the queue
+    if (parentControl._htmlElementQueue[element] != undefined && parentControl._htmlElementQueue[element].length > 0) {
+      parentControl._addHtml(element);
+    }
+
+    // Add queued child controls
+    while (control._htmlControlQueue.length > 0) {
+      control._addHtmlQueue(control._htmlControlQueue.shift());
+    }
+  }
+
+  _htmlPollElementId(id) {
+    document.getElementById(id);
   }
 
   /**
@@ -652,7 +704,7 @@ class ui extends Dispatcher {
           eData.attributes.id = id;
           idList[id] = id;
 
-          elementHtml_new = elementHtml_new.replace(/^<[a-zA-Z]*/gmi, `<${eType} id="${id}"`);    
+          elementHtml_new = elementHtml_new.replace(/^<[a-zA-Z]*/gmi, `<${eType} id="${id}"`);
         }
       } else if (!idList[eData.attributes.id]) {
         idList[eData.attributes.id] = `${eData.attributes.id}_${control._uuid}`;
@@ -740,7 +792,7 @@ class ui extends Dispatcher {
       let e = elementType;
       // Set element type to _default if element + attribute combination is not found in map.
       if (!__bindingMap[e] || !__bindingMap[e][attribute]) e = '_default';
-      
+
       if (__bindingMap[e] && __bindingMap[e][attribute]) {
         // Set initial value for JavaScript only attributes
         if (__bindingMap[e][attribute].jsOnly) element[attribute] = this[property];
@@ -807,44 +859,12 @@ class ui extends Dispatcher {
     }
   }
 
-  // // Set initial value
-  // this[b.element].value = this[b.valueProperty];
-
-  // // Flags for preventing double event firing
-  // let block1 = false;
-  // let block2 = false;
-
-  // // Listen for element value change
-  // let t = this;
-  // this[b.element].addEventListener('change', e => {
-  //   if (!block2) {
-  //     block1 = true;
-  //     block2 = false;
-  //     // To do: parse value if needed
-  //     t[b.valueProperty] = e.target.value;
-
-  //     // Notify change
-  //     t.NotifyProperty(b.valueProperty);
-  //   }
-  // });
-
-  // // Listen for property changes
-  // this.on(b.valueProperty, val => {
-  //   if (!block1) {
-  //     block2 = true;
-  //     block1 = false;
-
-  //     this[b.element].value = val;
-  //   }
-  // });
-
-
   /**
    * Get control data as an javascript object
    * @param {Object} options - { sparse: false/true (true [default]: Do not return empty properties; false: Return empty properties;) }
    * @returns 
    */
-  GetData(options = { sparse: true }) {
+  Get(options = { sparse: true }) {
     var data = {};
 
     // Get own properties
@@ -865,6 +885,13 @@ class ui extends Dispatcher {
     });
 
     return data;
+  }
+
+  /**
+   * Depreciated. Use Get().
+   */
+  GetData(options = { sparse: true }) {
+    this.Get(options);
   }
 
   /**
@@ -914,9 +941,6 @@ class ui extends Dispatcher {
           link.href = this._path + "/" + ref;
 
           head.appendChild(link);
-
-          // let r = this._path + "/" + ref;
-          // document.head.innerHTML += `<link rel="stylesheet" href="${r}">`;
         }
       }
       else {
@@ -930,7 +954,7 @@ class ui extends Dispatcher {
    * @param {string} className - name of the control class (script file name excluding extension)
    * @returns {Promise} - Returns a promise with a true / false result indicating if the script has been loaded successfully
    */
-  LoadScript(className) {
+  _loadScript(className) {
     if (this._getDynamicClass(className)) {
       return new Promise((resolve, reject) => {
         // Resolve empty promise indicating that no new class was loaded
@@ -939,7 +963,7 @@ class ui extends Dispatcher {
     } else {
       if (this._parent != undefined) {
         // Pass the request to the top level parent
-        return this._parent.LoadScript(className);
+        return this._parent._loadScript(className);
       }
       else {
         return new Promise(async (resolve, reject) => {
@@ -967,7 +991,7 @@ class ui extends Dispatcher {
                 // Extract extended class name
                 match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
                 match = match.replace(/[\t_ \n]*{/gm, '');
-                await this.LoadScript(match);
+                await this._loadScript(match);
               }
 
               // Load script
@@ -1024,19 +1048,17 @@ class ui extends Dispatcher {
   }
 
   /**
-   * Show the control
+   * Depreciated. Set visibility by setting control.visible to true/false.
    */
   Show() {
     this.visible = true;
-    this._element.style.display = this.display;
   }
 
   /**
-   * Hide the control
+   * Depreciated. Set visibility by setting control.visible to true/false.
    */
   Hide() {
     this.visible = false;
-    this._element.style.display = 'none';
   }
 
   // notifies parent of data change, and triggers onChange event.
@@ -1054,18 +1076,7 @@ class ui extends Dispatcher {
     this.emit("data", data);
   }
 
-  // notifies parent of the creation of a child control and fires an event with the control's name.
-  _notifyControlCreated(controlName, control) {
-    let n = `${this.name}.${controlName}`;
-    if (this._parent != undefined) {
-      this._parent._notifyControlCreated(n, control);
-    }
-
-    this.emit(controlName, control);
-    this.emit('newChildControl', control);
-  }
-
-  // Generate a unique ID for this control
+  // Generate a unique ID
   _generateUuid() {
     // code from https://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid
     return "_" + ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
