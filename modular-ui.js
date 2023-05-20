@@ -326,7 +326,7 @@ class ui extends Dispatcher {
           }
           // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
           else if (this._controls[k] != undefined) {
-            this._controls[k].SetData(data[k]);
+            this._controls[k].Set(data[k]);
           }
           // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
           // add new child controls to a controls queue.
@@ -342,7 +342,7 @@ class ui extends Dispatcher {
    * Depreciated. Use Set().
    */
   SetData(data) {
-    this.Set(data);
+    return this.Set(data);
   }
 
   /**
@@ -369,7 +369,7 @@ class ui extends Dispatcher {
         if (this._controls[c.name]) {
 
           // Set control child data
-          this._controls[c.name].SetData(c.data);
+          this._controls[c.name].Set(c.data);
         } else {
 
           // Child control does not exist: continue to create control.
@@ -444,7 +444,7 @@ class ui extends Dispatcher {
             this[c.name] = control;
 
             // Set control child data
-            control.SetData(c.data);
+            control.Set(c.data);
 
             // Control interal event subscriptions. Event subscriptions deliberately are done after control data is set 
             // (i.e. they will not emit on control creation).
@@ -877,10 +877,10 @@ class ui extends Dispatcher {
     // Get child controls properties
     Object.keys(this._controls).forEach((k) => {
       if (
-        this._controls[k].GetData() != undefined &&
+        this._controls[k].Get() != undefined &&
         !this._controls[k].hideData
       ) {
-        data[k] = this._controls[k].GetData();
+        data[k] = this._controls[k].Get();
       }
     });
 
@@ -891,7 +891,7 @@ class ui extends Dispatcher {
    * Depreciated. Use Get().
    */
   GetData(options = { sparse: true }) {
-    this.Get(options);
+    return this.Get(options);
   }
 
   /**
