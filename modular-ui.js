@@ -187,7 +187,7 @@ class ui extends Dispatcher {
   constructor() {
     super();
     this.name = "controlName"; // Special property indicating the name of the control. This cannot be changed in runtime.
-    this._path = ""; // Special property containing the path to the modular-ui controls classees.
+    this._path = ""; // Special property containing the path to the modular-ui control classes.
     this.controlType = this.constructor.name; // The name of the class. This property should not be set in code.
     this._parent = undefined; // Reference to the parent control (if any)
     this._topLevelParent = undefined; // Reference to the top level parent. Undefined if this control is the top level parent.
