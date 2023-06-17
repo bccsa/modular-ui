@@ -30,7 +30,7 @@ const __bindingMap = {
     value: { event: 'change', jsOnly: true },
   },
   select: {
-    value: { event: 'change' },
+    value: { event: 'change', jsOnly: true },
   },
   img: {
     src: {},
@@ -242,6 +242,21 @@ class ui extends Dispatcher {
     // top level control emit
     if (scope == 'top' || scope == 'local_top') {
       this._topLevelParent.emit(eventName, data);
+    }
+  }
+
+  /**
+   * Adds the listener function to the end of the listeners array for the event named eventName. No checks are made to see if the listener has already been added. Multiple calls passing the same combination of eventNameand listener will result in the listener being added, and called, multiple times.
+   * @param {string} eventName 
+   * @param {*} listener - callback function
+   * @param {*} options - Optional - Only for class property change events: Optional: { immediate: true } - Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing).
+   */
+  on(eventName, listener, options = {}) {
+    super.on(eventName, listener);
+
+    // Call the immediate callback
+    if (options && options.immediate && this[eventName] != undefined) {
+      listener(this[eventName]);
     }
   }
 
@@ -523,12 +538,12 @@ class ui extends Dispatcher {
       let fallbackTimer = setInterval(() => {
         // Try counter
         control._elementPollCounter += 1;
-        
+
         // Check if containing element exists in DOM
         if (document.getElementById(control._element.id)) {
           console.log(`Falling back to polling mechanism for control "${control.name}"`);
           this._htmlInit(observer, parentControl, element, control, fallbackTimer);
-        } 
+        }
         // Element not created. Stop polling
         else if (control._elementPollCounter >= 10) {
           // Stop fallback interval timer and mutation observer
