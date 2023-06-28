@@ -249,17 +249,45 @@ class ui extends Dispatcher {
    * Adds the listener function to the end of the listeners array for the event named eventName. No checks are made to see if the listener has already been added. Multiple calls passing the same combination of eventNameand listener will result in the listener being added, and called, multiple times.
    * @param {string} eventName 
    * @param {*} listener - callback function
-   * @param {*} options - Optional - Only for class property change events: Optional: { immediate: true } - Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing).
+   * @param {*} options - Optional: { immediate: true, caller: [caller control] } - immediate: true: (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent memory uncleared references to the removed control's callback functions.
    */
   on(eventName, listener, options = {}) {
     super.on(eventName, listener);
 
-    // Call the immediate callback
-    if (options && options.immediate && this[eventName] != undefined) {
-      listener(this[eventName]);
+    if (options) {
+      // Call the immediate callback
+      if (options.immediate && this[eventName] != undefined) {
+        listener(this[eventName]);
+      }
+
+      // Automatically unsubscribe from event if the caller is removed
+      if (options.caller && options.caller.on) {
+        options.caller.on('remove', () => {
+          this.off(eventName, listener);
+        });
+      }
     }
   }
 
+  /**
+   * Adds a one-timelistener function for the event named eventName. The next time eventName is triggered, this listener is removed and then invoked.
+   * @param {string} eventName 
+   * @param {*} listener - callback function
+   * @param {*} options - Optional: { caller: [caller control] } - caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent memory uncleared references to the removed control's callback functions.
+   */
+  once(eventName, listener, options) {
+    super.once(eventName, listener);
+
+    if (options) {
+      // Automatically unsubscribe from event if the caller is removed
+      if (options.caller && options.caller.on) {
+        options.caller.on('remove', () => {
+          this.off(eventName, listener);
+        });
+      }
+    }
+  }
+  
   // -------------------------------------
   // Override Getters & setters
   // -------------------------------------
