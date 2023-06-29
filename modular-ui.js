@@ -217,6 +217,12 @@ class ui extends Dispatcher {
 
     // Hide control's containing html div element on creation
     this._element.style.display = 'none';
+    this.orderBy = ''; // Property name by which the child controls should be sorted. Sorting is currently only supported in the default child controls element (_controlsDiv).
+    this.orderAsc = true;  // true: Sort asceding. False, sort decending. Sorting is currently only supported in the default child controls element (_controlsDiv).
+    this._sorted = []; // Internal array used for sorting of sortable child controls. (Sortable = contains a property with name as per orderBy value)
+    this._sortVal = ''; // Internal sort property string value
+    this.__sortCallback;  // Internal reference to a control's sorting callback
+    this._orderByPrev = ''; // Internal previous orderBy property value to keep track of changes
   }
 
   // -------------------------------------
@@ -287,7 +293,7 @@ class ui extends Dispatcher {
       }
     }
   }
-  
+
   // -------------------------------------
   // Override Getters & setters
   // -------------------------------------
@@ -486,8 +492,50 @@ class ui extends Dispatcher {
             // Add a direct reference to the control in this control
             this[c.name] = control;
 
+            // Subscribe to the orderBy and orderAsc events on child controls (used for sorting their child controls)
+            control.on('orderBy', this._order.bind(control), { caller: control });
+            control.on('orderAsc', this._order.bind(control), { caller: control });
+
+            // Check if sorting is enabled on the parent (this)
+            let orderBy = this.orderBy;
+            let subscribeChildOrderProp;
+            if (orderBy && c.data[orderBy] != undefined || control[orderBy] != undefined &&
+              !c.data._parentElement || c.data._parentElement == '_controlsDiv' &&
+              !control._parentElement || control._parentElement == '_controlsDiv') {
+              
+              // Add sortable string value
+              if (c.data[orderBy] != undefined) {
+                control._sortVal = c.data[orderBy].toString().toLowerCase();
+              } else {
+                // handle cases where orderBy property value is excluded due to sparse data.
+                control._sortVal = control[orderBy].toString().toLowerCase();
+              }
+
+              // Calculate index for inserting in _sorted array
+              let insertIndex;
+              if (this.orderAsc) {
+                insertIndex = this._sorted.findIndex(t => t._sortVal > control._sortVal);
+              } else {
+                insertIndex = this._sorted.findIndex(t => t._sortVal < control._sortVal);
+              }
+              if (insertIndex < 0) insertIndex = this._sorted.length;
+
+              // Insert into the _sorted array
+              this._sorted.splice(insertIndex, 0, control);
+
+              subscribeChildOrderProp = true;
+            }
+
             // Set control child data
             control.Set(c.data);
+
+            // Subscribe to the child control's order property after control.Set() to avoid triggering prop event on control creation (sorting on control creation is handled by _addHtml())
+            if (subscribeChildOrderProp) {
+              control.__sortCallback = function() {
+                this._orderSingle(control);
+              }.bind(this);
+              control.on(orderBy, control.__sortCallback, { caller: this });
+            }
 
             // Control interal event subscriptions. Event subscriptions deliberately are done after control data is set 
             // (i.e. they will not emit on control creation).
@@ -602,8 +650,25 @@ class ui extends Dispatcher {
       // Print HTML of child control into it's own top level element
       control._element.innerHTML = p.html;
 
-      // Add the child control's top level element to the parent's controls div
-      parentControl[element].appendChild(control._element);
+      // Check if sorting is enabled
+      if (parentControl.orderBy) {
+        // Sorted list if initialized sibling controls and this control
+        let sorted = parentControl._sorted.filter(f => f._init || f.name == control.name);
+
+        // Get control index position
+        let i = sorted.findIndex(t => t.name == control.name);
+        if (sorted.length <= 1 || i >= sorted.length - 1 || i < 0) {
+          // Add the child control's top level element to the end of the parent's controls div
+          parentControl[element].appendChild(control._element);
+        } else {
+          let nextControl = parentControl[sorted[i + 1].name];
+          // Insert the child control's top level element in it's sorted position
+          parentControl[element].insertBefore(control._element, nextControl._element);
+        }
+      } else {
+        // Add the child control's top level element to the parent's controls div
+        parentControl[element].appendChild(control._element);
+      }
     }
     catch (error) {
       console.log(`Unable to add HTML to element "${element}" in control "${this.name}". ${error.message}`);
@@ -1156,6 +1221,75 @@ class ui extends Dispatcher {
       }
     }
     return window._cls_[name];
+  }
+
+  // Order all child controls according to this control's orderBy and orderAsc properties.
+  _order() {
+    if (this.orderBy) {
+      // Subscribe to child controls orderBy properties
+      this._sorted.forEach(control => {
+        // Unsubscribe from previous property changes
+        if (control.__sortCallback) {
+          control.off(this._orderByPrev, control.__sortCallback);
+        }
+        
+        // Subscribe to new order property changes
+        control.__sortCallback = function() {
+          this._orderSingle(control);
+        }.bind(this);
+        control.on(this.orderBy, control.__sortCallback, { caller: this });
+      });
+
+      // Get sortable child controls
+      let sortable = [];
+      Object.values(this._controls).filter(t => t._init && t[this.orderBy] != undefined && !t._parentElement || t._parentElement == '_controlsDiv')
+      .forEach(c => {
+        c._sortVal = c[this.orderBy].toString().toLowerCase();
+        sortable.push(c);
+      });
+
+      // Sort
+      if (this.orderAsc) {
+        this._sorted = sortable.sort((a, b) => {
+          if (a._sortVal > b._sortVal) return 1;
+          if (b._sortVal > a._sortVal) return -1;
+          return 0;
+        });
+      } else {
+        this._sorted = sortable.sort((b, a) => {
+          if (a._sortVal > b._sortVal) return 1;
+          if (b._sortVal > a._sortVal) return -1;
+          return 0;
+        });
+      }
+
+      if (this._sorted.length >= 1) {
+        // Move the last sorted element to the end of the div
+        this['_controlsDiv'].appendChild(this._sorted[this._sorted.length - 1]._element);
+      }
+      // Apply sort order to html elements
+      for (let i = this._sorted.length - 2; i >= 0; i--) {
+        let element = this._sorted[i]._element;
+        let nextElement = this._sorted[i + 1]._element;
+        this['_controlsDiv'].insertBefore(element, nextElement);
+      }
+    } else {
+      this._sorted.forEach(control => {
+        // unsubscribe from child orderBy property changes
+        if (control.__sortCallback) {
+          control.off(this._orderByPrev, control.__sortCallback);
+          delete control.__sortCallback;
+        }
+      });
+      this._sorted = [];      
+    }
+
+    this._orderByPrev = this.orderBy;
+  }
+
+  // Change a single child control's sort position based on the property value defined by the parent's orderBy value.
+  _orderSingle(control) {
+    console.log(control.name);
   }
 }
 /* #endregion */
