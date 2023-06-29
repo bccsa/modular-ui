@@ -1013,6 +1013,9 @@ class ui extends Dispatcher {
       delete this._controls[control];
       delete this[control];
 
+      let sortedIndex = this._sorted.findIndex(t => t.name == c.name);
+      if (sortedIndex >= 0) this._sorted.splice(sortedIndex, 1);
+
       // Emit remove event
       c.emit('remove', c);
 
