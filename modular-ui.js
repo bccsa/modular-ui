@@ -1014,10 +1014,10 @@ class ui extends Dispatcher {
     // Get child controls properties
     Object.keys(this._controls).forEach((k) => {
       if (
-        this._controls[k].Get() != undefined &&
+        this._controls[k].Get != undefined &&
         !this._controls[k].hideData
       ) {
-        data[k] = this._controls[k].Get();
+        data[k] = this._controls[k].Get(options);
       }
     });
 
