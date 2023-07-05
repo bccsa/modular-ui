@@ -227,6 +227,10 @@ class ui extends Dispatcher {
      * Used internally to bypass updates notifications through the 'data' event when properties are set by Set();
      */
     this._bypassNotify = false;
+    /**
+     * Internal property used to store filter function set through this.filter();
+     */
+    this._filterFunction = undefined;
   }
 
   // -------------------------------------
@@ -259,9 +263,9 @@ class ui extends Dispatcher {
    * Adds the listener function to the end of the listeners array for the event named eventName. No checks are made to see if the listener has already been added. Multiple calls passing the same combination of eventNameand listener will result in the listener being added, and called, multiple times.
    * @param {string} eventName 
    * @param {*} listener - callback function
-   * @param {*} options - Optional: { immediate: true, caller: [caller control] } - immediate: true: (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent memory uncleared references to the removed control's callback functions.
+   * @param {*} options - Optional: { immediate: true, caller: [caller control] } - immediate: true: (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent uncleared references to the removed control's callback functions.
    */
-  on(eventName, listener, options = {}) {
+  on(eventName, listener, options) {
     super.on(eventName, listener);
 
     if (options) {
@@ -712,7 +716,15 @@ class ui extends Dispatcher {
 
     // Set initial visibility
     if (control.visible) {
-      control._element.style.display = control.visibleDisplayCss;
+      if (parentControl._filterFunction) {
+        if (parentControl._filterFunction(control)) {
+          control._element.style.display = control.visibleDisplayCss;
+        } else {
+          control._element.style.display = control.hiddenDisplayCss;
+        }
+      } else {
+        control._element.style.display = control.visibleDisplayCss;
+      }
     } else {
       control._element.style.display = control.hiddenDisplayCss;
     }
@@ -1342,6 +1354,48 @@ class ui extends Dispatcher {
     } else {
       let nextElement = this._sorted[insertIndex + 1]._element;
       this['_controlsDiv'].insertBefore(element, nextElement);
+    }
+  }
+
+  /**
+   * Set the filter function that should be applied to child controls' visibility. The filter() function does not change the control.visible property of child controls but merely hides / shows the HTML elements of the child controls based on the passed function output.
+   * @param {function} filterFunction - Filter function (e.g. t => t.filterProperty == filterValue)
+   */
+  filter(filterFunction) {
+    if (typeof filterFunction == 'function') {
+      this._filterFunction = filterFunction;
+      this._filter(filterFunction);
+    } else if (filterFunction == undefined) {
+      this._filterFunction = undefined;
+      this._filter();
+    } else {
+      console.log('Filter function is not a valid function');
+    }
+  }
+
+  /**
+   * Apply visual filter
+   * @param {function} filterFunction 
+   */
+  _filter(filterFunction) {
+    if (filterFunction) {
+      // Apply filter
+      Object.values(this._controls).forEach(control => {
+        if (control.visible) {
+          if (filterFunction(control)) {
+            control._element.style.display = control.visibleDisplayCss;
+          } else {
+            control._element.style.display = control.hiddenDisplayCss;
+          }
+        }
+      });
+    } else {
+      // Remove filter
+      Object.values(this._controls).forEach(control => {
+        if (control.visible) {
+          control._element.style.display = control.visibleDisplayCss;
+        }
+      });
     }
   }
 }

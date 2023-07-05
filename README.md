@@ -169,14 +169,58 @@ control.on('eventName', data =< {
 });
 ```
 
-#### one
+##### options
+Options can optionally be passed as a JavaScript object
+* immediate: true - (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); 
+* caller: [caller control] - Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent uncleared references to the removed control's callback functions.
+
+```javascript
+control.on('eventName', data =< {
+    // callback logic
+}, { immediate: true, caller: this });
+```
+
+#### once
 Subscribing to events for only one time. (After the event has fired, automatically unsubscribe.)
 ```javascript
-control.one('eventName', data =< {
+control.once('eventName', data =< {
     // callback logic
 });
 ```
 
+##### options
+Options can optionally be passed as a JavaScript object
+* caller: [caller control] - Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent uncleared references to the removed control's callback functions.
+
+```javascript
+control.once('eventName', data =< {
+    // callback logic
+}, { caller: this });
+```
+
+### Sorting
+Visual sorting of child controls can be done by setting the parent control's ```parent.orderBy``` property to the name of the child controls property by who's values the child controls should be sorted. The sort order can be changed from ascending to decending by setting ```parent.orderAsc``` to false. Ordering applied to existing child controls, and also applied when new child controls are added to the parent control.
+
+Example: The child controls have a property named 'displayOrder'.
+```javascript
+// Order child controls descending by displayOrder
+parent.orderAsc = false;
+parent.orderBy = 'displayOrder';
+```
+
+### Filtering
+Visual filtering of child controls can be done through the parent control's ```parent.filter()``` method. To apply a filter, pass a predicate function to the ```parent.filter()``` function. To clear the filter, call ```parent.filter()``` without any parameters. Visual filtering does not remove controls, but hides or shows the child control HTML elements. Filtering is applied to existing child controls, and also applied when new child controls are added to the parent control.
+
+Example: The child controls have a property named 'age'.
+```javascript
+// Filter to only show child controls with age > 10
+parent.filter(child => child.age > 10);
+
+// Clear the filter
+parent.filter();
+```
+
+To order the child controls
 ## Built-in events
 ### remove
 Emitted from a control after removal. The data returned is the control object
