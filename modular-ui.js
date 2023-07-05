@@ -226,7 +226,7 @@ class ui extends Dispatcher {
     /**
      * Used internally to bypass updates notifications through the 'data' event when properties are set by Set();
      */
-     this._bypassNotify = false;
+    this._bypassNotify = false;
   }
 
   // -------------------------------------
@@ -388,8 +388,8 @@ class ui extends Dispatcher {
           // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
           // add new child controls to a controls queue.
           else if (data[k] != null && data[k].controlType != undefined) {
-              // Wait 1ms before creating the control to prevent "freezing up" the browser (gives the event Javascript loop time to process other logic).
-              setTimeout(() => { this._createControl(data[k], k) }, 1);
+            // Wait 1ms before creating the control to prevent "freezing up" the browser (gives the event Javascript loop time to process other logic).
+            setTimeout(() => { this._createControl(data[k], k) }, 1);
           }
         }
       });
@@ -517,10 +517,18 @@ class ui extends Dispatcher {
 
               // Add sortable string value
               if (c.data[orderBy] != undefined) {
-                control._sortVal = c.data[orderBy].toString().toLowerCase();
+                if (typeof c.data[orderBy] == 'number') {
+                  control._sortVal = c.data[orderBy];
+                } else {
+                  control._sortVal = c.data[orderBy].toString().toLowerCase();
+                }
               } else {
                 // handle cases where orderBy property value is excluded due to sparse data.
-                control._sortVal = control[orderBy].toString().toLowerCase();
+                if (typeof c.data[orderBy] == 'number') {
+                  control._sortVal = control[orderBy];
+                } else {
+                  control._sortVal = control[orderBy].toString().toLowerCase();
+                }
               }
 
               // Calculate index for inserting in _sorted array
@@ -1256,7 +1264,11 @@ class ui extends Dispatcher {
       let sortable = [];
       Object.values(this._controls).filter(t => t._init && t[this.orderBy] != undefined && !t._parentElement || t._parentElement == '_controlsDiv')
         .forEach(c => {
-          c._sortVal = c[this.orderBy].toString().toLowerCase();
+          if (typeof c[this.orderBy] == 'number') {
+            c._sortVal = c[this.orderBy]
+          } else {
+            c._sortVal = c[this.orderBy].toString().toLowerCase();
+          }
           sortable.push(c);
         });
 
@@ -1301,8 +1313,12 @@ class ui extends Dispatcher {
 
   // Change a single child control's sort position based on the property value defined by the parent's orderBy value.
   _orderSingle(control) {
-    control._sortVal = control[this.orderBy].toString().toLowerCase();
-
+    if (typeof control[this.orderBy] == 'number') {
+      control._sortVal = control[this.orderBy]
+    } else {
+      control._sortVal = control[this.orderBy].toString().toLowerCase();
+    }
+    
     // Remove control from _sorted array
     let removeIndex = this._sorted.findIndex(t => t.name == control.name);
     if (removeIndex >= 0) this._sorted.splice(removeIndex, 1);
