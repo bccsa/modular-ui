@@ -223,6 +223,10 @@ class ui extends Dispatcher {
     this._sortVal = ''; // Internal sort property string value
     this.__sortCallback;  // Internal reference to a control's sorting callback
     this._orderByPrev = ''; // Internal previous orderBy property value to keep track of changes
+    /**
+     * Used internally to bypass updates notifications through the 'data' event when properties are set by Set();
+     */
+     this._bypassNotify = false;
   }
 
   // -------------------------------------
@@ -345,7 +349,7 @@ class ui extends Dispatcher {
 
   /**
    * Sets a javascript data object, and updates values, creates and removes controls as applicable.
-   * @param {*} data 
+   * @param {object} data - Object data to be set
    */
   Set(data) {
     if (data && typeof data == 'object') {
@@ -366,11 +370,15 @@ class ui extends Dispatcher {
               typeof this[k] == "boolean" ||
               Array.isArray(this[k]))) {
             if (data[k] != null && data[k] != undefined) {
+              this._bypassNotify = true;
               this[k] = data[k];
+              this._bypassNotify = false;
             }
             else {
               // Prevent properties to be set to undefined or null
+              this._bypassNotify = true;
               this[k] = `${data[k]}`;
+              this._bypassNotify = false;
             }
           }
           // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
@@ -380,7 +388,8 @@ class ui extends Dispatcher {
           // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
           // add new child controls to a controls queue.
           else if (data[k] != null && data[k].controlType != undefined) {
-            this._createControl(data[k], k);
+              // Wait 1ms before creating the control to prevent "freezing up" the browser (gives the event Javascript loop time to process other logic).
+              setTimeout(() => { this._createControl(data[k], k) }, 1);
           }
         }
       });
@@ -480,6 +489,9 @@ class ui extends Dispatcher {
                     if (this._properties[k] != val) {
                       this._properties[k] = val;
                       this.emit(k, val);
+                      if (!this._bypassNotify) {
+                        this.NotifyProperty(k);
+                      }
                     }
                   }
                 });
@@ -955,9 +967,6 @@ class ui extends Dispatcher {
             block1 = true;
             this[property] = v;
             block1 = false;
-
-            // Notify property change
-            this.NotifyProperty(property);
           } else {
             console.log(`${this.name}: Unable to process element changes "${event}" for property "${property}": Invalid value (value not string, number or boolean)`);
           }
