@@ -1,8 +1,12 @@
 # modular-ui
 A data-first, event driven, parent-child structured javascript front-end framework
 
+---
+
 ### Structure
 "User Controls" are created as JavaScript classes. (Class inheritance is supported.) Child controls are added as key / value pairs to parent controls.
+
+---
 
 ### Identifier tags
 Identifier tags ```@{identifier}``` can be used in the control's HTML to easily create references to elements and to link element attributes / text content to control class properties. Supported element attributes are automatically updated on class property value changes, and supported input elements will automatically update the class property value and notify the change (see (#notifying-property-changes-externally)).
@@ -44,6 +48,8 @@ class demo extends ui {
 }
 ```
 In the above example the label text content and text input value will both be linked to the 'anotherCoolProperty' class property.
+
+---
 
 ### Parent - Child structure
 modular-ui makes use of a parent-child structure, where child controls are added as properties to parent controls.
@@ -102,6 +108,7 @@ parent.Set({
     }
 });
 ```
+---
 
 ### Notifying property changes
 On control creation through Set(), properties not starting with "_" of boolean, string, number or array types are automatically equipped with getters and setters. The setters fires an event with the property name and updated value when the property value is set.
@@ -116,11 +123,13 @@ this.on('propertyName', val => {
 ```
 Note: property change events are emitted locally only (see Events - scope = local).
 
+---
+
 ### Notifying property changes externally
 When calling ```this.NotifyProperty('property_name')```, modular-ui will fire a 'data' event from the top level control containing the full path to the property.
 
 *Note*
-When using ```@{identifier}``` tags in user editable HTML element attributes, modular-ui will automatically call 'NotifyProperty' for the associated class property when the element attribute value is changed by the user.
+When using ```@{identifier}``` tags in user editable HTML element attributes, modular-ui will automatically call 'NotifyProperty' for the associated class property when the element attribute value is changed by the user (through HTML data binding) or when the property is set with JavaScript.
 
 Example
 ```javascript
@@ -141,6 +150,9 @@ console output:
     }
 }
 ```
+
+---
+
 ### Events
 moduler-ui implements a configurable event emitter.
 
@@ -167,6 +179,14 @@ Subscribing to events:
 control.on('eventName', data =< {
     // callback logic
 });
+
+// Cache the callback function to unsubscribe later
+let c = control.on('eventName', data =< {
+    // callback logic
+});
+
+// Unsubscribe from event
+control.off('eventName', c);
 ```
 
 ##### options
@@ -186,6 +206,14 @@ Subscribing to events for only one time. (After the event has fired, automatical
 control.once('eventName', data =< {
     // callback logic
 });
+
+// Cache the callback function to unsubscribe later
+let c = control.once('eventName', data =< {
+    // callback logic
+});
+
+// Unsubscribe from event
+control.off('eventName', c);
 ```
 
 ##### options
@@ -198,6 +226,8 @@ control.once('eventName', data =< {
 }, { caller: this });
 ```
 
+---
+
 ### Sorting
 Visual sorting of child controls can be done by setting the parent control's ```parent.orderBy``` property to the name of the child controls property by who's values the child controls should be sorted. The sort order can be changed from ascending to decending by setting ```parent.orderAsc``` to false. Ordering applied to existing child controls, and also applied when new child controls are added to the parent control.
 
@@ -207,6 +237,8 @@ Example: The child controls have a property named 'displayOrder'.
 parent.orderAsc = false;
 parent.orderBy = 'displayOrder';
 ```
+
+---
 
 ### Filtering
 Visual filtering of child controls can be done through the parent control's ```parent.filter()``` method. To apply a filter, pass a predicate function to the ```parent.filter()``` function. To clear the filter, call ```parent.filter()``` without any parameters. Visual filtering does not remove controls, but hides or shows the child control HTML elements. Filtering is applied to existing child controls, and also applied when new child controls are added to the parent control.
@@ -221,6 +253,8 @@ parent.filter(child => child.age > 10);
 // Clear the filter
 parent.filter();
 ```
+
+---
 
 To order the child controls
 ## Built-in events
@@ -244,5 +278,5 @@ Change the display to hide the control.
 ### display
 
 ## To do
-[ ] Set() Performance improvement: Cache object paths on first call.
-[ ] Document built-in events
+- [ ] Set() Performance improvement: Cache object paths on first call.
+- [ ] Document built-in events
