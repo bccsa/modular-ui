@@ -87,7 +87,7 @@ class DispatcherEvent {
       }
     });
 
-    // Unregister callbacks for all "one" events
+    // Unregister callbacks for all "once" events
     once.forEach((c) => {
       this.unregisterCallback(c.callback);
     });
@@ -131,13 +131,22 @@ class Dispatcher {
    * @param {string} eventName 
    * @param {*} callback 
    */
-  one(eventName, callback) {
+  once(eventName, callback) {
     let event = this.events[eventName];
     if (!event) {
       event = new DispatcherEvent(eventName);
       this.events[eventName] = event;
     }
     event.registerCallback(callback, true);
+  }
+
+  /**
+   * Depreciated. Use once()
+   * @param {*} eventName 
+   * @param {*} callback 
+   */
+  one(eventName, callback) {
+    this.once(eventName, callback);
   }
 
   /**
@@ -1133,7 +1142,7 @@ class ui extends Dispatcher {
       else {
         return new Promise(async (resolve, reject) => {
           // Subscribe to the _scriptLoad event
-          this.one(`_scriptLoad_${className}`, result => {
+          this.once(`_scriptLoad_${className}`, result => {
             resolve(result);
           });
 
