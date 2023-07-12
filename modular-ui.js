@@ -399,13 +399,11 @@ class ui extends Dispatcher {
             if (data[k] != null && data[k] != undefined) {
               this._bypassNotify = true;
               this[k] = data[k];
-              this._bypassNotify = false;
             }
             else {
               // Prevent properties to be set to undefined or null
               this._bypassNotify = true;
               this[k] = `${data[k]}`;
-              this._bypassNotify = false;
             }
           }
           // Update child controls. If a child control shares the name of a settable property, the child control will not receive data.
@@ -515,10 +513,12 @@ class ui extends Dispatcher {
                     // Only emit property changes
                     if (this._properties[k] != val) {
                       this._properties[k] = val;
-                      this.emit(k, val);
                       if (!this._bypassNotify) {
                         this.NotifyProperty(k);
+                      } else {
+                        this._bypassNotify = false;
                       }
+                      this.emit(k, val);
                     }
                   }
                 });
