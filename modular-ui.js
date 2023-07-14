@@ -519,6 +519,8 @@ class ui extends Dispatcher {
                         this._bypassNotify = false;
                       }
                       this.emit(k, val);
+                    } else {
+                      this._bypassNotify = false;
                     }
                   }
                 });
@@ -1072,15 +1074,16 @@ class ui extends Dispatcher {
   RemoveChild(control) {
     if (this._controls[control] != undefined) {
       let c = this._controls[control];
+
+      // Emit remove event
+      c.emit('remove', c);
+
       this._controls[control].RemoveHtml();
       delete this._controls[control];
       delete this[control];
 
       let sortedIndex = this._sorted.findIndex(t => t.name == c.name);
       if (sortedIndex >= 0) this._sorted.splice(sortedIndex, 1);
-
-      // Emit remove event
-      c.emit('remove', c);
 
       // Unregister from all events
       c.clearEvents();
