@@ -243,12 +243,20 @@ parent.orderBy = 'displayOrder';
 ### Filtering
 Visual filtering of child controls can be done through the parent control's ```parent.filter()``` method. To apply a filter, pass a predicate function to the ```parent.filter()``` function. To clear the filter, call ```parent.filter()``` without any parameters. Visual filtering does not remove controls, but hides or shows the child control HTML elements. Filtering is applied to existing child controls, and also applied when new child controls are added to the parent control.
 
-Filtering does currently not filter live on child controls property changes (e.g. if child.age would change in the example below, the filter will not be applied).
-
 Example: The child controls have a property named 'age'.
 ```javascript
 // Filter to only show child controls with age > 10
 parent.filter(child => child.age > 10);
+
+// Clear the filter
+parent.filter();
+```
+
+#### Filtering live on property changes
+Example: The child controls have a property named 'age' and 'length'.
+```javascript
+// Filter to only show child controls with age > 10
+parent.filter(child => child.age > 10 && child.length > 162, {monitor: ["age", "length"]});
 
 // Clear the filter
 parent.filter();
