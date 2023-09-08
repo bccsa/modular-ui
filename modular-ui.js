@@ -87,7 +87,7 @@ class DispatcherEvent {
       }
     });
 
-    // Unregister callbacks for all "one" events
+    // Unregister callbacks for all "once" events
     once.forEach((c) => {
       this.unregisterCallback(c.callback);
     });
@@ -131,7 +131,7 @@ class Dispatcher {
    * @param {string} eventName 
    * @param {*} callback 
    */
-  one(eventName, callback) {
+  once(eventName, callback) {
     let event = this.events[eventName];
     if (!event) {
       event = new DispatcherEvent(eventName);
@@ -141,17 +141,24 @@ class Dispatcher {
   }
 
   /**
+   * Depreciated. Use once()
+   * @param {*} eventName 
+   * @param {*} callback 
+   */
+  one(eventName, callback) {
+    this.once(eventName, callback);
+  }
+
+  /**
    * Unsubscribe from event
    * @param {string} eventName 
    * @param {*} callback 
    */
   off(eventName, callback) {
     const event = this.events[eventName];
-    if (event && event.callbacks.indexOf(callback) > -1) {
-      event.unregisterCallback(callback);
-      if (event.callbacks.length === 0) {
-        delete this.events[eventName];
-      }
+    event.unregisterCallback(callback);
+    if (event.callbacks.length === 0) {
+      delete this.events[eventName];
     }
   }
 
@@ -217,6 +224,28 @@ class ui extends Dispatcher {
 
     // Hide control's containing html div element on creation
     this._element.style.display = 'none';
+    this.orderBy = ''; // Property name by which the child controls should be sorted. Sorting is currently only supported in the default child controls element (_controlsDiv).
+    this.orderAsc = true;  // true: Sort asceding. False, sort decending. Sorting is currently only supported in the default child controls element (_controlsDiv).
+    this._sorted = []; // Internal array used for sorting of sortable child controls. (Sortable = contains a property with name as per orderBy value)
+    this._sortVal = ''; // Internal sort property string value
+    this.__sortCallback;  // Internal reference to a control's sorting callback
+    this._orderByPrev = ''; // Internal previous orderBy property value to keep track of changes
+    /**
+     * Used internally to bypass updates notifications through the 'data' event when properties are set by Set();
+     */
+    this._bypassNotify = false;
+    /**
+     * Internal property used to store filter function set through this.filter();
+     */
+    this._filterFunction = undefined;
+    /**
+     * Internal list for keeping track of filter property monitor event subscriptions
+     */
+    this._filterMonitorProperties = {};
+    /**
+     * Cached property event callbacks used by the parent's parent.filter() function
+     */
+    this._filterCallbacks = {};
   }
 
   // -------------------------------------
@@ -249,9 +278,10 @@ class ui extends Dispatcher {
    * Adds the listener function to the end of the listeners array for the event named eventName. No checks are made to see if the listener has already been added. Multiple calls passing the same combination of eventNameand listener will result in the listener being added, and called, multiple times.
    * @param {string} eventName 
    * @param {*} listener - callback function
-   * @param {*} options - Optional: { immediate: true, caller: [caller control] } - immediate: true: (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent memory uncleared references to the removed control's callback functions.
+   * @param {*} options - Optional: { immediate: true, caller: [caller control] } - immediate: true: (only for class property change events) Calls the 'listener' callback function immediately on subscription with the current value of the property (if existing); caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent uncleared references to the removed control's callback functions.
+   * @returns - Returns a reference to passed callback (listener) function.
    */
-  on(eventName, listener, options = {}) {
+  on(eventName, listener, options) {
     super.on(eventName, listener);
 
     if (options) {
@@ -267,6 +297,8 @@ class ui extends Dispatcher {
         });
       }
     }
+
+    return listener;
   }
 
   /**
@@ -274,6 +306,7 @@ class ui extends Dispatcher {
    * @param {string} eventName 
    * @param {*} listener - callback function
    * @param {*} options - Optional: { caller: [caller control] } - caller: [caller control]: Subscribes to the 'remove' event of the caller, and automatically unsubscribes from the event when the caller is removed. This helps to prevent memory uncleared references to the removed control's callback functions.
+   * @returns - Returns a reference to passed callback (listener) function.
    */
   once(eventName, listener, options) {
     super.once(eventName, listener);
@@ -286,8 +319,10 @@ class ui extends Dispatcher {
         });
       }
     }
+
+    return listener;
   }
-  
+
   // -------------------------------------
   // Override Getters & setters
   // -------------------------------------
@@ -339,7 +374,7 @@ class ui extends Dispatcher {
 
   /**
    * Sets a javascript data object, and updates values, creates and removes controls as applicable.
-   * @param {*} data 
+   * @param {object} data - Object data to be set
    */
   Set(data) {
     if (data && typeof data == 'object') {
@@ -360,10 +395,12 @@ class ui extends Dispatcher {
               typeof this[k] == "boolean" ||
               Array.isArray(this[k]))) {
             if (data[k] != null && data[k] != undefined) {
+              this._bypassNotify = true;
               this[k] = data[k];
             }
             else {
               // Prevent properties to be set to undefined or null
+              this._bypassNotify = true;
               this[k] = `${data[k]}`;
             }
           }
@@ -374,7 +411,8 @@ class ui extends Dispatcher {
           // Create a new child control if the passed data has controlType set. If this control is not ready yet (Init did not run yet),
           // add new child controls to a controls queue.
           else if (data[k] != null && data[k].controlType != undefined) {
-            this._createControl(data[k], k);
+            // Wait 1ms before creating the control to prevent "freezing up" the browser (gives the event Javascript loop time to process other logic).
+            setTimeout(() => { this._createControl(data[k], k) }, 1);
           }
         }
       });
@@ -473,7 +511,14 @@ class ui extends Dispatcher {
                     // Only emit property changes
                     if (this._properties[k] != val) {
                       this._properties[k] = val;
+                      if (!this._bypassNotify) {
+                        this.NotifyProperty(k);
+                      } else {
+                        this._bypassNotify = false;
+                      }
                       this.emit(k, val);
+                    } else {
+                      this._bypassNotify = false;
                     }
                   }
                 });
@@ -486,8 +531,58 @@ class ui extends Dispatcher {
             // Add a direct reference to the control in this control
             this[c.name] = control;
 
+            // Subscribe to the orderBy and orderAsc events on child controls (used for sorting their child controls)
+            control.on('orderBy', this._order.bind(control), { caller: control });
+            control.on('orderAsc', this._order.bind(control), { caller: control });
+
+            // Check if sorting is enabled on the parent (this)
+            let orderBy = this.orderBy;
+            let subscribeChildOrderProp;
+            if (orderBy && c.data[orderBy] != undefined || control[orderBy] != undefined &&
+              !c.data._parentElement || c.data._parentElement == '_controlsDiv' &&
+              !control._parentElement || control._parentElement == '_controlsDiv') {
+
+              // Add sortable string value
+              if (c.data[orderBy] != undefined) {
+                if (typeof c.data[orderBy] == 'number') {
+                  control._sortVal = c.data[orderBy];
+                } else {
+                  control._sortVal = c.data[orderBy].toString().toLowerCase();
+                }
+              } else {
+                // handle cases where orderBy property value is excluded due to sparse data.
+                if (typeof c.data[orderBy] == 'number') {
+                  control._sortVal = control[orderBy];
+                } else {
+                  control._sortVal = control[orderBy].toString().toLowerCase();
+                }
+              }
+
+              // Calculate index for inserting in _sorted array
+              let insertIndex;
+              if (this.orderAsc) {
+                insertIndex = this._sorted.findIndex(t => t._sortVal > control._sortVal);
+              } else {
+                insertIndex = this._sorted.findIndex(t => t._sortVal < control._sortVal);
+              }
+              if (insertIndex < 0) insertIndex = this._sorted.length;
+
+              // Insert into the _sorted array
+              this._sorted.splice(insertIndex, 0, control);
+
+              subscribeChildOrderProp = true;
+            }
+
             // Set control child data
             control.Set(c.data);
+
+            // Subscribe to the child control's order property after control.Set() to avoid triggering prop event on control creation (sorting on control creation is handled by _addHtml())
+            if (subscribeChildOrderProp) {
+              control.__sortCallback = function () {
+                this._orderSingle(control);
+              }.bind(this);
+              control.on(orderBy, control.__sortCallback, { caller: this });
+            }
 
             // Control interal event subscriptions. Event subscriptions deliberately are done after control data is set 
             // (i.e. they will not emit on control creation).
@@ -495,9 +590,9 @@ class ui extends Dispatcher {
             // set individually where needed.
             control.on('visible', visible => {
               if (visible) {
-                control._element.style.display = control.visibleDisplayCss;
+                control._show();
               } else {
-                control._element.style.display = control.hiddenDisplayCss;
+                control._hide();
               }
             });
             this.on('cssText', val => {
@@ -602,8 +697,25 @@ class ui extends Dispatcher {
       // Print HTML of child control into it's own top level element
       control._element.innerHTML = p.html;
 
-      // Add the child control's top level element to the parent's controls div
-      parentControl[element].appendChild(control._element);
+      // Check if sorting is enabled
+      if (parentControl.orderBy) {
+        // Sorted list if initialized sibling controls and this control
+        let sorted = parentControl._sorted.filter(f => f._init || f.name == control.name);
+
+        // Get control index position
+        let i = sorted.findIndex(t => t.name == control.name);
+        if (sorted.length <= 1 || i >= sorted.length - 1 || i < 0) {
+          // Add the child control's top level element to the end of the parent's controls div
+          parentControl[element].appendChild(control._element);
+        } else {
+          let nextControl = parentControl[sorted[i + 1].name];
+          // Insert the child control's top level element in it's sorted position
+          parentControl[element].insertBefore(control._element, nextControl._element);
+        }
+      } else {
+        // Add the child control's top level element to the parent's controls div
+        parentControl[element].appendChild(control._element);
+      }
     }
     catch (error) {
       console.log(`Unable to add HTML to element "${element}" in control "${this.name}". ${error.message}`);
@@ -627,10 +739,29 @@ class ui extends Dispatcher {
 
     // Set initial visibility
     if (control.visible) {
-      control._element.style.display = control.visibleDisplayCss;
+      if (parentControl._filterFunction) {
+        if (parentControl._filterFunction(control)) {
+          control._show();
+        } else {
+          control._hide();
+        }
+      } else {
+        control._show();
+      }
     } else {
-      control._element.style.display = control.hiddenDisplayCss;
+      control._hide();
     }
+
+    // Subscribe to filter property events for newly created controls
+    Object.keys(parentControl._filterMonitorProperties).forEach(propertyName => {
+      control._filterCallbacks[propertyName] = control.on(propertyName, () => {
+        if (parentControl._filterFunction && parentControl._filterFunction(control)) {
+          control._show();
+        } else {
+          control._hide();
+        }
+      }, { caller: parentControl });
+    });
 
     // Run (overridden) control initialisation logic
     control.Init();
@@ -890,9 +1021,6 @@ class ui extends Dispatcher {
             block1 = true;
             this[property] = v;
             block1 = false;
-
-            // Notify property change
-            this.NotifyProperty(property);
           } else {
             console.log(`${this.name}: Unable to process element changes "${event}" for property "${property}": Invalid value (value not string, number or boolean)`);
           }
@@ -920,10 +1048,10 @@ class ui extends Dispatcher {
     // Get child controls properties
     Object.keys(this._controls).forEach((k) => {
       if (
-        this._controls[k].Get() != undefined &&
+        this._controls[k].Get != undefined &&
         !this._controls[k].hideData
       ) {
-        data[k] = this._controls[k].Get();
+        data[k] = this._controls[k].Get(options);
       }
     });
 
@@ -944,12 +1072,16 @@ class ui extends Dispatcher {
   RemoveChild(control) {
     if (this._controls[control] != undefined) {
       let c = this._controls[control];
+
+      // Emit remove event
+      c.emit('remove', c);
+
       this._controls[control].RemoveHtml();
       delete this._controls[control];
       delete this[control];
 
-      // Emit remove event
-      c.emit('remove', c);
+      let sortedIndex = this._sorted.findIndex(t => t.name == c.name);
+      if (sortedIndex >= 0) this._sorted.splice(sortedIndex, 1);
 
       // Unregister from all events
       c.clearEvents();
@@ -1011,7 +1143,7 @@ class ui extends Dispatcher {
       else {
         return new Promise(async (resolve, reject) => {
           // Subscribe to the _scriptLoad event
-          this.one(`_scriptLoad_${className}`, result => {
+          this.once(`_scriptLoad_${className}`, result => {
             resolve(result);
           });
 
@@ -1104,6 +1236,20 @@ class ui extends Dispatcher {
     this.visible = false;
   }
 
+  /**
+   * Set the CSS visibility to visible. This does not change the control.visible property.
+   */
+  _show() {
+    this._element.style.display = this.visibleDisplayCss;
+  }
+
+  /**
+   * Set the CSS visibility to hidden. This does not change the control.visible property.
+   */
+  _hide() {
+    this._element.style.display = this.hiddenDisplayCss;
+  }
+
   // notifies parent of data change, and triggers onChange event.
   _notify(data) {
     if (this._parent != undefined) {
@@ -1156,6 +1302,198 @@ class ui extends Dispatcher {
       }
     }
     return window._cls_[name];
+  }
+
+  // Order all child controls according to this control's orderBy and orderAsc properties.
+  _order() {
+    if (this.orderBy) {
+      // Subscribe to child controls orderBy properties
+      this._sorted.forEach(control => {
+        // Unsubscribe from previous property changes
+        if (control.__sortCallback) {
+          control.off(this._orderByPrev, control.__sortCallback);
+        }
+
+        // Subscribe to new order property changes
+        control.__sortCallback = function () {
+          this._orderSingle(control);
+        }.bind(this);
+        control.on(this.orderBy, control.__sortCallback, { caller: this });
+      });
+
+      // Get sortable child controls
+      let sortable = [];
+      Object.values(this._controls).filter(t => t._init && t[this.orderBy] != undefined && !t._parentElement || t._parentElement == '_controlsDiv')
+        .forEach(c => {
+          if (typeof c[this.orderBy] == 'number') {
+            c._sortVal = c[this.orderBy]
+          } else {
+            c._sortVal = c[this.orderBy].toString().toLowerCase();
+          }
+          sortable.push(c);
+        });
+
+      // Sort
+      if (this.orderAsc) {
+        this._sorted = sortable.sort((a, b) => {
+          if (a._sortVal > b._sortVal) return 1;
+          if (b._sortVal > a._sortVal) return -1;
+          return 0;
+        });
+      } else {
+        this._sorted = sortable.sort((b, a) => {
+          if (a._sortVal > b._sortVal) return 1;
+          if (b._sortVal > a._sortVal) return -1;
+          return 0;
+        });
+      }
+
+      if (this._sorted.length >= 1) {
+        // Move the last sorted element to the end of the div
+        this['_controlsDiv'].appendChild(this._sorted[this._sorted.length - 1]._element);
+      }
+      // Apply sort order to html elements
+      for (let i = this._sorted.length - 2; i >= 0; i--) {
+        let element = this._sorted[i]._element;
+        let nextElement = this._sorted[i + 1]._element;
+        this['_controlsDiv'].insertBefore(element, nextElement);
+      }
+    } else {
+      this._sorted.forEach(control => {
+        // unsubscribe from child orderBy property changes
+        if (control.__sortCallback) {
+          control.off(this._orderByPrev, control.__sortCallback);
+          delete control.__sortCallback;
+        }
+      });
+      this._sorted = [];
+    }
+
+    this._orderByPrev = this.orderBy;
+  }
+
+  // Change a single child control's sort position based on the property value defined by the parent's orderBy value.
+  _orderSingle(control) {
+    if (typeof control[this.orderBy] == 'number') {
+      control._sortVal = control[this.orderBy]
+    } else {
+      control._sortVal = control[this.orderBy].toString().toLowerCase();
+    }
+    
+    // Remove control from _sorted array
+    let removeIndex = this._sorted.findIndex(t => t.name == control.name);
+    if (removeIndex >= 0) this._sorted.splice(removeIndex, 1);
+
+    // Calculate index for inserting in _sorted array
+    let insertIndex;
+    if (this.orderAsc) {
+      insertIndex = this._sorted.findIndex(t => t._sortVal > control._sortVal);
+    } else {
+      insertIndex = this._sorted.findIndex(t => t._sortVal < control._sortVal);
+    }
+    if (insertIndex < 0) insertIndex = this._sorted.length;
+
+    // Insert into the _sorted array
+    this._sorted.splice(insertIndex, 0, control);
+
+    // Apply sort order to HTML element
+    let element = control._element;
+    if (insertIndex >= this._sorted.length - 1) {
+      this['_controlsDiv'].appendChild(element);
+    } else {
+      let nextElement = this._sorted[insertIndex + 1]._element;
+      this['_controlsDiv'].insertBefore(element, nextElement);
+    }
+  }
+
+  /**
+   * Set the filter function that should be applied to child controls' visibility. The filter() function does not change the control.visible property of child controls but merely hides / shows the HTML elements of the child controls based on the passed function output.
+   * @param {function} filterFunction - Filter function (e.g. t => t.filterProperty == filterValue)
+   * @param {object} options - Optional filter options: { monitor: ['propertyName1', 'propertyName2'] } - monitor: An array of child control property names which will trigger the filter on child property value(s) change.
+   */
+  filter(filterFunction, options) {
+    if (typeof filterFunction == 'function') {
+      this._filterFunction = filterFunction;
+      this._filter(filterFunction, options);
+    } else if (filterFunction == undefined) {
+      this._filterFunction = undefined;
+      this._filter();
+    } else {
+      console.log('Filter function is not a valid function');
+    }
+  }
+
+  /**
+   * Apply visual filter
+   * @param {function} filterFunction 
+   * @param {object} options - Optional filter options: { monitor: ['propertyName1', 'propertyName2'] } - monitor: An array of child control property names which will trigger the filter on child property value(s) change.
+   */
+  _filter(filterFunction, options) {
+
+    if (options && options.monitor && Array.isArray(options.monitor)) {
+      // Add new filter options
+      options.monitor.forEach(propertyName => {
+        if (!this._filterMonitorProperties[propertyName]) {
+          this._filterMonitorProperties[propertyName] = true;
+
+          // Subscribe to property change event on all existing child controls
+          Object.values(this._controls).forEach(control => {
+            control._filterCallbacks[propertyName] = control.on(propertyName, () => {
+              if (filterFunction && filterFunction(control)) {
+                control._show();
+              } else {
+                control._hide();
+              }
+            }, { caller: this });
+          });
+        }
+      });
+
+      // Remove old filter options
+      Object.keys(this._filterMonitorProperties).forEach(propertyName => {
+        if (!options.monitor.find(p => p == propertyName)) {
+          delete this._filterMonitorProperties[propertyName];
+
+          // Unsubscribe from property change event on all child controls
+          Object.values(this._controls).forEach(control => {
+            if (control._filterCallbacks[propertyName]) {
+              control.off(propertyName, control._filterCallbacks[propertyName]);
+              delete control._filterCallbacks[propertyName];
+            }
+          });
+        }
+      });
+    } else {
+      this._filterMonitorProperties = {};
+
+      // Unsubscribe from all property change events on all child controls if no property names to be monitored is passed.
+      Object.values(this._controls).forEach(control => {
+        Object.keys(control._filterCallbacks).forEach(propertyName => {
+          control.off(propertyName, control._filterCallbacks[propertyName]);
+          delete control._filterCallbacks[propertyName];
+        });
+      });
+    }
+    
+    if (filterFunction) {
+      // Apply filter
+      Object.values(this._controls).forEach(control => {
+        if (control.visible) {
+          if (filterFunction(control)) {
+            control._show();
+          } else {
+            control._hide();
+          }
+        }
+      });
+    } else {
+      // Remove filter
+      Object.values(this._controls).forEach(control => {
+        if (control.visible) {
+          control._show();
+        }
+      });
+    }
   }
 }
 /* #endregion */
