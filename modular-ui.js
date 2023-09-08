@@ -156,11 +156,9 @@ class Dispatcher {
    */
   off(eventName, callback) {
     const event = this.events[eventName];
-    if (event && event.callbacks.indexOf(callback) > -1) {
-      event.unregisterCallback(callback);
-      if (event.callbacks.length === 0) {
-        delete this.events[eventName];
-      }
+    event.unregisterCallback(callback);
+    if (event.callbacks.length === 0) {
+      delete this.events[eventName];
     }
   }
 
