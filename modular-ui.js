@@ -1549,7 +1549,7 @@ class uiTopLevelContainer extends ui {
 
 /**
  * _uiClasses is a function added to modular-ui, to be able to extend a class with more that one class
- * !!! Important to note, that if both super classes contains the same function (function name, one will be overwriten)
+ * !!! Important to note, that if both super classes contains the same porperty/ function (porperty/ function name, will be overwriten by the last class loaded containing that property/ function)
  * Link to referance used: https://stackoverflow.com/questions/29879267/es6-class-multiple-inheritance
  * @param {Object} baseClass - Base class to be extended with sub classes 
  * @param  {...any} mixins - Classes to be added to the base class, (comma separated eg. uiClasses(BaseClass, ClassA, ClassB, ClassC))

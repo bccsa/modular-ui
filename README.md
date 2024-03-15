@@ -285,6 +285,27 @@ Change the display to hide the control.
 ## Built-in properties
 ### display
 
+---
+
+## Extend Classes
+
+### Standard
+use standard javascript to extend a class
+```js
+class ClassA extends ClassB {
+    ...
+}
+```
+
+### Extend a class with multiple classes
+modular-ui build in function to extend a javascript class with muiltiple other classes
+* ***Importand to note that if more that one superclass contains a property/ function that has the same name, it will be overwritten by the last class containing that propery/ function*** 
+```js
+class ClassA extends _uiClasses(ClassB, ClassC, ClassD) {
+    ...
+}
+```
+
 ## To do
 - [ ] Set() Performance improvement: Cache object paths on first call.
 - [ ] Document built-in events
