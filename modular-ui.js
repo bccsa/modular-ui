@@ -1153,11 +1153,15 @@ class ui extends Dispatcher {
 
             try {
               // Download script file to check if script extends another class
-              let scriptFile = await fetch(this._path + "/" + className + ".js");
+              let scriptFile;
+              await fetch(this._path + "/" + className + ".js")
+              // Catch fetch error's (https://stackoverflow.com/questions/39297345/fetch-resolves-even-if-404)
+              .then((res) => { if (!res.ok) { throw new Error(""); } else { scriptFile = res } })
+              .catch((err) => { throw new Error(""); });
               let text = await scriptFile.text();
 
               // Match class with extend keyword
-              let match = text.match(/class[\t_a-zA-Z0-9 ]*extends[\t_a-zA-Z0-9 \n]*{/gm);
+              let match = text.match(/class[\t_a-zA-Z0-9 ]*(?<=extends).*(?={)/gm);
               if (Array.isArray(match)) {
                 match = match[0];
               }
@@ -1166,7 +1170,14 @@ class ui extends Dispatcher {
                 // Extract extended class name
                 match = match.replace(/class[\t_a-zA-Z0-9 ]*extends[ \t\n]*/gm, '');
                 match = match.replace(/[\t_ \n]*{/gm, '');
-                await this._loadScript(match);
+                match = match.replace(/_uiClasses/m, '');
+                match = match.replace(/[^a-zA-Z0-9_ ]/gm, ' ');
+                match = match.split(/\s+/gm);
+                if (match.length > 0) {
+                  let _p = [];
+                  match.forEach(async m => _p.push(new Promise(async (resolve) => { m && await this._loadScript(m); resolve() })))
+                  await Promise.all(_p);
+                }
               }
 
               // Load script
@@ -1184,6 +1195,10 @@ class ui extends Dispatcher {
 
               // Set script path including the root path passed to the top level parent element
               script.src = this._path + "/" + className + ".js";
+
+              // Ignore reject error's
+              var rejectHandler = (event) =>{}; 
+              script.addEventListener('error', rejectHandler);
 
               // Add to DOM head
               document.head.appendChild(script);
@@ -1528,4 +1543,40 @@ class uiTopLevelContainer extends ui {
     this._init = true;
   }
 }
+/* #endregion */
+
+/* #region  multiple extendable classes */
+
+/**
+ * _uiClasses is a function added to modular-ui, to be able to extend a class with more that one class
+ * !!! Important to note, that if both super classes contains the same function (function name, one will be overwriten)
+ * Link to referance used: https://stackoverflow.com/questions/29879267/es6-class-multiple-inheritance
+ * @param {Object} baseClass - Base class to be extended with sub classes 
+ * @param  {...any} mixins - Classes to be added to the base class, (comma separated eg. uiClasses(BaseClass, ClassA, ClassB, ClassC))
+ * @returns Base class 
+ */
+function _uiClasses (baseClass, ...mixins) {
+  class base extends baseClass {
+      constructor (...args) {
+          super(...args);
+          mixins.forEach((mixin) => {
+              copyProps(this,(new mixin));
+          });
+      }
+  }
+  let copyProps = (target, source) => {  // this function copies all properties and symbols, filtering out some special ones
+      Object.getOwnPropertyNames(source)
+              .concat(Object.getOwnPropertySymbols(source))
+              .forEach((prop) => {
+                  if (!prop.match(/^(?:constructor|prototype|arguments|caller|name|bind|call|apply|toString|length)$/))
+                  Object.defineProperty(target, prop, Object.getOwnPropertyDescriptor(source, prop));
+              })
+  }
+  mixins.forEach((mixin) => { // outside contructor() to allow aggregation(A,B,C).staticFunction() to be called etc.
+      copyProps(base.prototype, mixin.prototype);
+      copyProps(base, mixin);
+  });
+  return base;
+}
+
 /* #endregion */
