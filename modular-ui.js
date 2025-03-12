@@ -1161,7 +1161,7 @@ class ui extends Dispatcher {
               let text = await scriptFile.text();
 
               // Match class with extend keyword
-              let match = text.match(/class[\t_a-zA-Z0-9 ]*(?<=extends).*(?={)/gm);
+              let match = text.match(/class[\t_a-zA-Z0-9 ]*extends.*{/gm);
               if (Array.isArray(match)) {
                 match = match[0];
               }
